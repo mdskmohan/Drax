@@ -11,10 +11,11 @@ from app.database import AsyncSessionLocal
 from app.models.user import User
 from app.models.meal_log import MealLog
 from app.agents.nutrition_agent import NutritionAgent
+from app.graph import drax_graph
 from app.bot.keyboards import meal_type_keyboard, main_menu_keyboard
 
 
-nutrition_agent = NutritionAgent()
+nutrition_agent = NutritionAgent()  # kept for photo handler
 
 
 async def log_meal_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -56,7 +57,7 @@ async def meal_type_selected(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 
 async def process_meal_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
-    """Process a text meal log."""
+    """Process a text meal log via LangGraph."""
     if not context.user_data.get("awaiting_meal_input"):
         return False
 
@@ -65,76 +66,24 @@ async def process_meal_text(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     meal_type = context.user_data.pop("pending_meal_type", "snack")
     context.user_data.pop("awaiting_meal_input", None)
 
-    # Send "processing" indicator
     processing_msg = await update.message.reply_text("🔍 Analyzing your meal...")
 
-    async with AsyncSessionLocal() as session:
-        # Get user
-        result = await session.execute(select(User).where(User.id == user_id))
-        user = result.scalar_one_or_none()
-        if not user:
-            await processing_msg.edit_text("Please /start first to set up your profile.")
-            return True
+    result = await drax_graph.ainvoke({
+        "user_id": user_id,
+        "user_input": text,
+        "intent": "log_meal",
+        "context": {"meal_type": meal_type},
+    })
 
-        # Parse nutrition
-        nutrition = await nutrition_agent.parse_meal(user, text)
+    response = result.get("response", "✅ Meal logged!")
+    if len(response) > 4000:
+        response = response[:4000] + "..."
 
-        # Get today's calories
-        today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
-        cal_result = await session.execute(
-            select(func.sum(MealLog.calories))
-            .where(MealLog.user_id == user_id)
-            .where(MealLog.logged_at >= today_start)
-        )
-        today_calories = cal_result.scalar() or 0.0
-
-        # Get AI feedback
-        feedback = await nutrition_agent.get_meal_feedback(
-            user, text, nutrition,
-            today_calories + nutrition.get("total_calories", 0)
-        )
-
-        # Save to database
-        meal_log = MealLog(
-            user_id=user_id,
-            meal_type=meal_type,
-            food_description=text,
-            parsed_foods=nutrition.get("foods", []),
-            calories=nutrition.get("total_calories", 0),
-            protein_g=nutrition.get("total_protein_g", 0),
-            carbs_g=nutrition.get("total_carbs_g", 0),
-            fat_g=nutrition.get("total_fat_g", 0),
-            fiber_g=nutrition.get("total_fiber_g", 0),
-            sodium_mg=nutrition.get("total_sodium_mg", 0),
-            source="text",
-            ai_feedback=feedback,
-        )
-        session.add(meal_log)
-        await session.commit()
-
-        # Calculate totals for today
-        new_total = today_calories + nutrition.get("total_calories", 0)
-        remaining = (user.daily_calorie_target or 2000) - new_total
-
-        cal = nutrition.get("total_calories", 0)
-        protein = nutrition.get("total_protein_g", 0)
-        carbs = nutrition.get("total_carbs_g", 0)
-        fat = nutrition.get("total_fat_g", 0)
-
-        await processing_msg.edit_text(
-            f"✅ *{meal_type.capitalize()} logged!*\n\n"
-            f"📊 *Nutrition:*\n"
-            f"🔥 Calories: *{cal:.0f} kcal*\n"
-            f"💪 Protein: {protein:.1f}g\n"
-            f"🌾 Carbs: {carbs:.1f}g\n"
-            f"🧈 Fat: {fat:.1f}g\n\n"
-            f"📈 *Today's Total:* {new_total:.0f} / {user.daily_calorie_target or 2000} kcal\n"
-            f"{'✅' if remaining >= 0 else '⚠️'} Remaining: {remaining:.0f} kcal\n\n"
-            f"💬 *Coach says:*\n_{feedback}_",
-            parse_mode="Markdown",
-            reply_markup=main_menu_keyboard(),
-        )
-
+    await processing_msg.edit_text(
+        response,
+        parse_mode="Markdown",
+        reply_markup=main_menu_keyboard(),
+    )
     return True
 
 

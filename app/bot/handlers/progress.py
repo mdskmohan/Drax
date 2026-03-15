@@ -13,10 +13,11 @@ from app.models.meal_log import MealLog
 from app.models.water_log import WaterLog
 from app.models.workout_log import WorkoutLog
 from app.agents.progress_agent import ProgressAgent
+from app.graph import drax_graph
 from app.bot.keyboards import main_menu_keyboard
 
 
-progress_agent = ProgressAgent()
+progress_agent = ProgressAgent()  # kept for generate_weekly_report
 
 
 async def log_weight_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -39,7 +40,7 @@ async def log_weight_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def process_weight_log(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
-    """Process weight log entry."""
+    """Process weight log entry via LangGraph."""
     if not context.user_data.get("awaiting_weight"):
         return False
 
@@ -47,58 +48,28 @@ async def process_weight_log(update: Update, context: ContextTypes.DEFAULT_TYPE)
     user_id = update.effective_user.id
     context.user_data.pop("awaiting_weight", None)
 
-    try:
-        weight = float(text.replace("kg", "").strip())
-        if not 30 <= weight <= 300:
-            raise ValueError
-    except ValueError:
-        await update.message.reply_text("Please enter a valid weight in kg (e.g., 89.5)")
-        return True
+    processing_msg = await update.message.reply_text("⚖️ Logging your weight...")
 
-    async with AsyncSessionLocal() as session:
-        result = await session.execute(select(User).where(User.id == user_id))
-        user = result.scalar_one_or_none()
-        if not user:
-            return True
+    result = await drax_graph.ainvoke({
+        "user_id": user_id,
+        "user_input": text,
+        "intent": "log_weight",
+    })
 
-        # Get AI feedback
-        feedback = await progress_agent.log_weight_feedback(user, weight)
+    response = result.get("response", "⚖️ Weight logged!")
+    if len(response) > 4000:
+        response = response[:4000] + "..."
 
-        # Log weight
-        wl = WeightLog(user_id=user_id, weight_kg=weight, ai_feedback=feedback)
-        session.add(wl)
-
-        # Update user's current weight
-        old_weight = user.current_weight_kg
-        user.current_weight_kg = weight
-        await session.commit()
-
-        # Build progress bar
-        if user.goal_weight_kg and old_weight:
-            start = max(old_weight, weight)  # use starting weight or current higher
-            bar = progress_agent.build_progress_bar(weight, old_weight or weight + 1, user.goal_weight_kg)
-        else:
-            bar = ""
-
-        change = (old_weight - weight) if old_weight else 0
-        change_str = f"📉 -{abs(change):.1f}kg" if change > 0 else f"📈 +{abs(change):.1f}kg" if change < 0 else "= No change"
-
-        await update.message.reply_text(
-            f"⚖️ *Weight logged: {weight}kg*\n\n"
-            f"{change_str} from last log\n"
-            f"Goal: {user.goal_weight_kg}kg\n"
-            f"Remaining: {weight - (user.goal_weight_kg or weight):.1f}kg\n\n"
-            + (bar + "\n\n" if bar else "") +
-            f"💬 *Coach:* _{feedback}_",
-            parse_mode="Markdown",
-            reply_markup=main_menu_keyboard(),
-        )
-
+    await processing_msg.edit_text(
+        response,
+        parse_mode="Markdown",
+        reply_markup=main_menu_keyboard(),
+    )
     return True
 
 
 async def show_progress(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Show overall progress summary."""
+    """Show overall progress summary via LangGraph."""
     query = update.callback_query
     user_id = update.effective_user.id if not query else query.from_user.id
 
@@ -108,89 +79,21 @@ async def show_progress(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         msg = await update.message.reply_text("📊 Loading your progress...")
 
-    async with AsyncSessionLocal() as session:
-        result = await session.execute(select(User).where(User.id == user_id))
-        user = result.scalar_one_or_none()
-        if not user:
-            await msg.edit_text("Please /start to set up your profile.")
-            return
+    result = await drax_graph.ainvoke({
+        "user_id": user_id,
+        "user_input": "show my progress",
+        "intent": "get_progress",
+    })
 
-        # Last 7 days stats
-        seven_days_ago = datetime.now(timezone.utc) - timedelta(days=7)
-        today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    response = result.get("response", "📊 Could not load progress. Try again.")
+    if len(response) > 4000:
+        response = response[:4000] + "..."
 
-        # Weight history
-        weights_result = await session.execute(
-            select(WeightLog).where(WeightLog.user_id == user_id).order_by(WeightLog.logged_at)
-        )
-        all_weights = weights_result.scalars().all()
-
-        # Today's calories
-        cal_result = await session.execute(
-            select(func.sum(MealLog.calories))
-            .where(MealLog.user_id == user_id)
-            .where(MealLog.logged_at >= today_start)
-        )
-        today_cal = cal_result.scalar() or 0.0
-
-        # Today's water
-        water_result = await session.execute(
-            select(func.sum(WaterLog.amount_ml))
-            .where(WaterLog.user_id == user_id)
-            .where(WaterLog.logged_at >= today_start)
-        )
-        today_water = water_result.scalar() or 0.0
-
-        # Weekly workouts
-        workouts_result = await session.execute(
-            select(WorkoutLog)
-            .where(WorkoutLog.user_id == user_id)
-            .where(WorkoutLog.created_at >= seven_days_ago)
-        )
-        weekly_workouts = workouts_result.scalars().all()
-        completed_this_week = sum(1 for w in weekly_workouts if w.completed)
-
-        # Build response
-        lost_total = (
-            (all_weights[0].weight_kg - user.current_weight_kg)
-            if all_weights else 0
-        )
-        remaining = (user.current_weight_kg or 0) - (user.goal_weight_kg or 0)
-
-        lines = [
-            f"📊 *Your Progress Dashboard*\n",
-            f"━━━━━━━━━━━━━━━━",
-            f"⚖️ *Weight Journey*",
-            f"  Starting: {all_weights[0].weight_kg if all_weights else user.current_weight_kg}kg",
-            f"  Current: {user.current_weight_kg}kg",
-            f"  Goal: {user.goal_weight_kg}kg",
-            f"  Lost: {lost_total:.1f}kg | Remaining: {remaining:.1f}kg\n",
-        ]
-
-        if user.current_weight_kg and user.goal_weight_kg and lost_total > 0:
-            bar = progress_agent.build_progress_bar(
-                user.current_weight_kg,
-                all_weights[0].weight_kg if all_weights else user.current_weight_kg,
-                user.goal_weight_kg,
-            )
-            lines.append(f"  {bar}\n")
-
-        lines += [
-            f"━━━━━━━━━━━━━━━━",
-            f"📅 *Today*",
-            f"  🔥 Calories: {today_cal:.0f} / {user.daily_calorie_target or 2000} kcal",
-            f"  💧 Water: {today_water:.0f} / {user.daily_water_target_ml or 3000} ml\n",
-            f"━━━━━━━━━━━━━━━━",
-            f"🏋️ *This Week*",
-            f"  Workouts: {completed_this_week} / {user.gym_days_per_week} completed",
-            f"  Timeline: {user.timeline_months} months | Target: {user.weekly_weight_loss_target_kg or '?'}kg/week",
-        ]
-
-        await msg.edit_text(
-            "\n".join(lines),
-            parse_mode="Markdown",
-            reply_markup=main_menu_keyboard(),
-        )
+    await msg.edit_text(
+        response,
+        parse_mode="Markdown",
+        reply_markup=main_menu_keyboard(),
+    )
 
 
 async def generate_weekly_report(update: Update, context: ContextTypes.DEFAULT_TYPE):

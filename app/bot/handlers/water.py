@@ -10,10 +10,11 @@ from app.database import AsyncSessionLocal
 from app.models.user import User
 from app.models.water_log import WaterLog
 from app.agents.hydration_agent import HydrationAgent
+from app.graph import drax_graph
 from app.bot.keyboards import water_quick_keyboard, main_menu_keyboard
 
 
-hydration_agent = HydrationAgent()
+hydration_agent = HydrationAgent()  # kept for _log_and_respond helper
 
 
 async def log_water_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -54,23 +55,27 @@ async def water_amount_callback(update: Update, context: ContextTypes.DEFAULT_TY
 
 
 async def process_water_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
-    """Process custom water amount text."""
+    """Process custom water amount text via LangGraph."""
     if not context.user_data.get("awaiting_water_input"):
         return False
 
     text = update.message.text.strip()
     context.user_data.pop("awaiting_water_input", None)
 
-    amount_ml = hydration_agent.parse_water_amount(text)
-    if amount_ml is None:
-        await update.message.reply_text(
-            "❌ I couldn't understand that amount.\n\n"
-            "Try: _500ml_, _2 glasses_, _1L_, _1 bottle_",
-            parse_mode="Markdown",
-        )
-        return True
+    processing_msg = await update.message.reply_text("💧 Logging water...")
 
-    await _log_and_respond(update.effective_user.id, amount_ml, message=update.message)
+    result = await drax_graph.ainvoke({
+        "user_id": update.effective_user.id,
+        "user_input": text,
+        "intent": "log_water",
+    })
+
+    response = result.get("response", "💧 Water logged!")
+    await processing_msg.edit_text(
+        response,
+        parse_mode="Markdown",
+        reply_markup=main_menu_keyboard(),
+    )
     return True
 
 
