@@ -7,14 +7,22 @@ class Settings(BaseSettings):
     telegram_bot_token: str
     telegram_webhook_url: str = ""
 
-    # Anthropic (Claude)
-    anthropic_api_key: str
+    # ── LLM Provider ──────────────────────────────────────────────────────────
+    # Set LLM_PROVIDER to: claude | openai | deepseek
+    llm_provider: str = "claude"
+    llm_main_model: str = ""   # leave blank to use provider default
+    llm_fast_model: str = ""   # leave blank to use provider default
 
-    # Nutritionix
+    # API keys — only the one matching your provider is required
+    anthropic_api_key: str = ""   # provider=claude
+    openai_api_key: str = ""      # provider=openai
+    deepseek_api_key: str = ""    # provider=deepseek
+
+    # Nutritionix (optional — accurate calorie/macro data)
     nutritionix_app_id: str = ""
     nutritionix_api_key: str = ""
 
-    # YouTube
+    # YouTube Data API (optional — exercise tutorial videos)
     youtube_api_key: str = ""
 
     # Database
@@ -28,7 +36,7 @@ class Settings(BaseSettings):
     app_host: str = "0.0.0.0"
     app_port: int = 8000
     debug: bool = False
-    secret_key: str = "change_me"
+    secret_key: str = "change_me_in_production"
 
     # Defaults
     default_daily_water_ml: int = 3000

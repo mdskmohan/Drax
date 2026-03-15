@@ -5,7 +5,7 @@ Claude excels at empathy and tone, making it ideal for this agent.
 import random
 from app.agents.base_agent import BaseAgent
 from app.models.user import User
-from app.services import claude
+from app.services.llm import llm
 from app.services.youtube import search_exercise_video
 
 
@@ -27,7 +27,7 @@ class MotivationAgent(BaseAgent):
 
     async def get_morning_motivation(self, user: User) -> str:
         weight_left = user.weight_to_lose_kg or 35
-        return await claude.chat_completion(
+        return await llm.chat(
             messages=[{"role": "user", "content": f"Write a powerful morning motivation message. The user has {weight_left}kg left to lose. Make it personal, energetic, under 100 words. End with a bold power mantra on its own line."}],
             system=self._system_str(MOTIVATION_ROLE, user),
             temperature=0.9,
@@ -35,7 +35,7 @@ class MotivationAgent(BaseAgent):
         )
 
     async def get_pre_workout_pump(self, user: User, workout_type: str) -> str:
-        return await claude.chat_completion(
+        return await llm.chat(
             messages=[{"role": "user", "content": f"It's {workout_type} day! Write an intense 3-4 sentence pre-workout pump-up. Make them feel unstoppable right now."}],
             system=self._system_str(MOTIVATION_ROLE, user),
             temperature=0.95,
@@ -43,7 +43,7 @@ class MotivationAgent(BaseAgent):
         )
 
     async def get_streak_celebration(self, user: User, streak_days: int) -> str:
-        return await claude.fast_completion(
+        return await llm.fast(
             messages=[{"role": "user", "content": f"The user just hit {streak_days} days in a row! Write an exciting celebration message under 80 words."}],
             system=self._system_str(MOTIVATION_ROLE, user),
             temperature=0.9,
@@ -51,7 +51,7 @@ class MotivationAgent(BaseAgent):
         )
 
     async def get_accountability_nudge(self, user: User, missed_item: str) -> str:
-        return await claude.fast_completion(
+        return await llm.fast(
             messages=[{"role": "user", "content": f"The user missed: {missed_item} today. Write a compassionate but firm nudge (2-3 sentences). No shame — redirect and motivate for tomorrow."}],
             system=self._system_str(MOTIVATION_ROLE, user),
             temperature=0.7,
@@ -59,7 +59,7 @@ class MotivationAgent(BaseAgent):
         )
 
     async def get_comeback_message(self, user: User, days_missed: int) -> str:
-        return await claude.chat_completion(
+        return await llm.chat(
             messages=[{"role": "user", "content": f"User has been inactive for {days_missed} days. Welcome them back warmly, acknowledge the break, motivate to restart today. No judgment. Pure encouragement. Under 100 words."}],
             system=self._system_str(MOTIVATION_ROLE, user),
             temperature=0.8,

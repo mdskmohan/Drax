@@ -3,7 +3,7 @@ Fitness Coach Agent — Claude Sonnet for workout generation.
 """
 from app.agents.base_agent import BaseAgent
 from app.models.user import User
-from app.services import claude
+from app.services.llm import llm
 from app.services.youtube import get_workout_videos
 
 
@@ -58,7 +58,7 @@ Return JSON with this exact structure:
             }
         ]
 
-        plan = await claude.json_completion(
+        plan = await llm.json(
             messages, system=self._system_str(COACH_ROLE, user), max_tokens=2048
         )
 
@@ -67,21 +67,21 @@ Return JSON with this exact structure:
         return plan
 
     async def generate_rest_day_message(self, user: User) -> str:
-        return await claude.chat_completion(
+        return await llm.chat(
             messages=[{"role": "user", "content": "Today is a rest day. Write a short motivating message (3-4 sentences) explaining why rest is important and suggest 1-2 light recovery activities like a walk or stretching."}],
             system=self._system_str(COACH_ROLE, user),
             max_tokens=300,
         )
 
     async def adjust_workout_for_pain(self, user: User, pain_description: str) -> str:
-        return await claude.chat_completion(
+        return await llm.chat(
             messages=[{"role": "user", "content": f"The user reports: '{pain_description}'\n\nProvide a modified workout that avoids the affected area, suggest recovery steps, and advise when to see a doctor if needed. Be empathetic and safety-first."}],
             system=self._system_str(COACH_ROLE, user),
             max_tokens=600,
         )
 
     async def get_weekly_workout_schedule(self, user: User) -> dict:
-        return await claude.json_completion(
+        return await llm.json(
             messages=[{"role": "user", "content": f"""Create a 7-day workout schedule. Gym days available: {user.gym_days_per_week}/week.
 Return JSON: {{"schedule": {{"Monday": "...", "Tuesday": "...", "Wednesday": "...", "Thursday": "...", "Friday": "...", "Saturday": "...", "Sunday": "..."}}, "weekly_summary": "..."}}"""}],
             system=self._system_str(COACH_ROLE, user),

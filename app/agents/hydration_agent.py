@@ -3,7 +3,7 @@ Hydration Agent — rule-based tracking with Claude Haiku for tips.
 """
 from app.agents.base_agent import BaseAgent
 from app.models.user import User
-from app.services import claude
+from app.services.llm import llm
 
 
 class HydrationAgent(BaseAgent):
@@ -76,7 +76,7 @@ class HydrationAgent(BaseAgent):
 
     async def get_hydration_tip(self, user: User, consumed_ml: int, target_ml: int) -> str:
         pct = round(consumed_ml / target_ml * 100) if target_ml > 0 else 0
-        return await claude.fast_completion(
+        return await llm.fast(
             messages=[{"role": "user", "content": f"User has drunk {consumed_ml}ml ({pct}% of {target_ml}ml goal). Give a quick 1-2 sentence hydration tip."}],
             system="You are a hydration coach. Give short, encouraging hydration tips.",
             max_tokens=100,

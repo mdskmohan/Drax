@@ -3,7 +3,7 @@ Progress Agent — Claude Sonnet for detailed weekly reports and trend analysis.
 """
 from app.agents.base_agent import BaseAgent
 from app.models.user import User
-from app.services import claude
+from app.services.llm import llm
 
 
 PROGRESS_ROLE = """You are a data-driven fitness progress analyst and coach.
@@ -23,7 +23,7 @@ class ProgressAgent(BaseAgent):
             user.daily_calorie_target or 2000,
             user.daily_water_target_ml or 3000,
         )
-        return await claude.chat_completion(
+        return await llm.chat(
             messages=[{"role": "user", "content": f"""Generate a detailed weekly progress report.
 
 WEEK STATS:
@@ -52,7 +52,7 @@ Make it personal, data-driven, and motivating. Use emojis."""}],
         remaining = weights[-1] - (user.goal_weight_kg or weights[-1] - 35)
         eta_weeks = round(remaining / weekly_rate) if weekly_rate > 0 else None
 
-        result = await claude.json_completion(
+        result = await llm.json(
             messages=[{"role": "user", "content": f"""Starting: {weights[0]}kg | Current: {weights[-1]}kg | Lost: {round(total_lost,2)}kg over {weeks} weeks | Rate: {round(weekly_rate,2)}kg/week | Remaining: {round(remaining,2)}kg
 Return JSON: {{"trend": "on_track|ahead|behind|plateau", "analysis": "2-3 sentences", "eta_weeks": {eta_weeks or 0}}}"""}],
             system=self._system_str(PROGRESS_ROLE, user),
@@ -65,7 +65,7 @@ Return JSON: {{"trend": "on_track|ahead|behind|plateau", "analysis": "2-3 senten
     async def log_weight_feedback(self, user: User, new_weight: float) -> str:
         change = (user.current_weight_kg or new_weight) - new_weight
         direction = f"lost {abs(round(change, 2))}kg" if change > 0 else f"gained {abs(round(change, 2))}kg" if change < 0 else "no change"
-        return await claude.fast_completion(
+        return await llm.fast(
             messages=[{"role": "user", "content": f"User logged {new_weight}kg (previous: {user.current_weight_kg}kg, change: {direction}). Write a 2-sentence response. Celebrate loss, normalize gain, explain plateau."}],
             system=self._system_str(PROGRESS_ROLE, user),
             max_tokens=150,
