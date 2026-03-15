@@ -1,10 +1,14 @@
 """
-Fitness Coach Agent — Claude Sonnet for workout generation.
+Fitness Coach Agent — Claude Sonnet for workout generation, with daily caching.
 """
+from datetime import date
 from app.agents.base_agent import BaseAgent
 from app.models.user import User
 from app.services.llm import llm
 from app.services.youtube import get_workout_videos
+
+# Simple in-process daily cache: {(user_id, date, day_of_week) -> plan}
+_workout_cache: dict = {}
 
 
 COACH_ROLE = """You are an expert personal fitness trainer and certified strength & conditioning coach.
@@ -24,6 +28,11 @@ class FitnessCoachAgent(BaseAgent):
         recent_workouts: list[dict] | None = None,
         is_gym_day: bool = True,
     ) -> dict:
+        # Return cached plan if already generated today (saves LLM cost on repeat /workout calls)
+        cache_key = (user.id, date.today(), day_of_week)
+        if cache_key in _workout_cache:
+            return _workout_cache[cache_key]
+
         recent_summary = f"\nRecent workouts: {recent_workouts}" if recent_workouts else ""
         messages = [
             {
@@ -64,14 +73,21 @@ Return JSON with this exact structure:
 
         exercise_names = [e.get("exercise", "") for e in plan.get("main_workout", [])]
         plan["youtube_links"] = await get_workout_videos(exercise_names[:5])
+
+        _workout_cache[cache_key] = plan
         return plan
 
-    async def generate_rest_day_message(self, user: User) -> str:
-        return await llm.chat(
-            messages=[{"role": "user", "content": "Today is a rest day. Write a short motivating message (3-4 sentences) explaining why rest is important and suggest 1-2 light recovery activities like a walk or stretching."}],
-            system=self._system_str(COACH_ROLE, user),
-            max_tokens=300,
-        )
+    def generate_rest_day_message(self, user: User) -> str:
+        """Return a rest-day message from pre-written variations — no LLM needed."""
+        import random
+        name = user.first_name or "Champion"
+        messages = [
+            f"Rest day, {name}! Your muscles repair and grow stronger during recovery — this is where the transformation happens. Go for a 20-min walk, stretch for 10 minutes, and sleep 8 hours. Tomorrow you'll be stronger. 💪",
+            f"Today is your secret weapon, {name}. Elite athletes treat rest days as seriously as training days. Light walking, foam rolling, and good nutrition today = a beast in the gym tomorrow. Trust the process.",
+            f"Recovery day! Your body is rebuilding right now, {name}. Skip the guilt — you've earned this. Try a 15-minute stretch routine or a gentle walk. Fuel up with protein and hydrate well. Come back tomorrow ready to crush it.",
+            f"Rest is not weakness, {name} — it's strategy. Your muscles are synthesizing protein and adapting. Keep moving lightly (walk, yoga), eat clean, drink your water, and let the gains happen.",
+        ]
+        return random.choice(messages)
 
     async def adjust_workout_for_pain(self, user: User, pain_description: str) -> str:
         return await llm.chat(

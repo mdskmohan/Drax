@@ -1,9 +1,8 @@
 """
-Hydration Agent — rule-based tracking with Claude Haiku for tips.
+Hydration Agent — pure rule-based tracking. Zero LLM calls needed here.
 """
 from app.agents.base_agent import BaseAgent
 from app.models.user import User
-from app.services.llm import llm
 
 
 class HydrationAgent(BaseAgent):
@@ -74,10 +73,16 @@ class HydrationAgent(BaseAgent):
             pass
         return None
 
-    async def get_hydration_tip(self, user: User, consumed_ml: int, target_ml: int) -> str:
-        pct = round(consumed_ml / target_ml * 100) if target_ml > 0 else 0
-        return await llm.fast(
-            messages=[{"role": "user", "content": f"User has drunk {consumed_ml}ml ({pct}% of {target_ml}ml goal). Give a quick 1-2 sentence hydration tip."}],
-            system="You are a hydration coach. Give short, encouraging hydration tips.",
-            max_tokens=100,
-        )
+    def get_hydration_tip(self, consumed_ml: int, target_ml: int) -> str:
+        """Return a hydration tip based on current percentage — no LLM needed."""
+        pct = (consumed_ml / target_ml * 100) if target_ml > 0 else 0
+        remaining = max(0, target_ml - consumed_ml)
+        if pct >= 100:
+            return "You've smashed your water goal today! Your body is thanking you. 💪"
+        if pct >= 75:
+            return f"Almost there — just {remaining}ml left. One more glass and you're done!"
+        if pct >= 50:
+            return f"Halfway through your water goal. Drink {remaining}ml more to finish strong."
+        if pct >= 25:
+            return f"You're running low on hydration. Set a reminder and drink {remaining}ml before end of day."
+        return f"Critical: only {consumed_ml}ml consumed. Dehydration kills your metabolism — drink a glass right now!"

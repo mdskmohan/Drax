@@ -27,7 +27,7 @@ class MotivationAgent(BaseAgent):
 
     async def get_morning_motivation(self, user: User) -> str:
         weight_left = user.weight_to_lose_kg or 35
-        return await llm.chat(
+        return await llm.fast(
             messages=[{"role": "user", "content": f"Write a powerful morning motivation message. The user has {weight_left}kg left to lose. Make it personal, energetic, under 100 words. End with a bold power mantra on its own line."}],
             system=self._system_str(MOTIVATION_ROLE, user),
             temperature=0.9,
@@ -35,10 +35,10 @@ class MotivationAgent(BaseAgent):
         )
 
     async def get_pre_workout_pump(self, user: User, workout_type: str) -> str:
-        return await llm.chat(
+        return await llm.fast(
             messages=[{"role": "user", "content": f"It's {workout_type} day! Write an intense 3-4 sentence pre-workout pump-up. Make them feel unstoppable right now."}],
             system=self._system_str(MOTIVATION_ROLE, user),
-            temperature=0.95,
+            temperature=0.9,
             max_tokens=150,
         )
 
@@ -59,7 +59,7 @@ class MotivationAgent(BaseAgent):
         )
 
     async def get_comeback_message(self, user: User, days_missed: int) -> str:
-        return await llm.chat(
+        return await llm.fast(
             messages=[{"role": "user", "content": f"User has been inactive for {days_missed} days. Welcome them back warmly, acknowledge the break, motivate to restart today. No judgment. Pure encouragement. Under 100 words."}],
             system=self._system_str(MOTIVATION_ROLE, user),
             temperature=0.8,

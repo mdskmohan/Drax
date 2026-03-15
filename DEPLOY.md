@@ -1,145 +1,167 @@
-# Drax Deployment Guide
+# Drax — Production Deployment Guide
 
-## Hosting Options Comparison
+## Which option should I pick?
 
-| Platform | Cost | Difficulty | Best for |
+| Platform | Monthly cost | Difficulty | Best for |
 |---|---|---|---|
-| **Railway** | Free $5/mo credit | ⭐ Easiest | Recommended — includes Postgres + Redis |
-| **Render** | Free tier | ⭐⭐ Easy | Good free option |
-| **Fly.io** | Free tier | ⭐⭐ Easy | Docker-native |
-| **VPS (Hetzner)** | €3.29/mo | ⭐⭐⭐ Manual | Best value, full control |
+| **Railway** | Free → $5+ | ⭐ Easiest | **Recommended.** Auto-provisions Postgres + Redis, zero config |
+| **Hetzner VPS** | €3.29–4.49 | ⭐⭐⭐ Manual | Best value for long-term hosting, full control |
+| **Render** | Free → $7+ | ⭐⭐ Easy | Good free option but spins down on inactivity |
+| **Fly.io** | Free → $5+ | ⭐⭐ Medium | Docker-native, global edge |
+
+**Bottom line:**
+- First time deploying? → **Railway**
+- Want the cheapest long-term? → **Hetzner VPS**
+- Free forever (but with cold starts)? → **Render free tier** (not great for a bot)
 
 ---
 
-## Option 1: Railway (Recommended — Easiest)
+## Option 1: Railway (Recommended)
 
-Railway auto-detects Docker, provisions Postgres and Redis for free.
+Railway detects your Dockerfile, provisions managed Postgres and Redis, gives you a public HTTPS URL, and auto-deploys on every `git push`. The free $5/month credit is usually enough for a personal-use bot.
 
-### Steps
+### Step-by-step
 
-1. **Push your code to GitHub first** (see GitHub section below)
-
-2. **Go to [railway.app](https://railway.app)** → Sign up with GitHub
-
-3. **New Project → Deploy from GitHub repo** → select your drax repo
-
-4. **Add PostgreSQL:**
-   - Click `+ New` → Database → PostgreSQL
-   - Railway auto-sets `DATABASE_URL` in your environment
-
-5. **Add Redis:**
-   - Click `+ New` → Database → Redis
-   - Railway auto-sets `REDIS_URL`
-
-6. **Set environment variables** in Railway dashboard → Variables:
-   ```
-   TELEGRAM_BOT_TOKEN=your_token
-   ANTHROPIC_API_KEY=your_key
-   TELEGRAM_WEBHOOK_URL=https://your-app.railway.app
-   DATABASE_URL=<auto-set by Railway>
-   REDIS_URL=<auto-set by Railway>
-   ```
-
-7. **Deploy** — Railway builds your Dockerfile automatically
-
-8. **Add Celery worker service:**
-   - New Service → GitHub repo (same repo)
-   - Override start command: `celery -A app.tasks.celery_app worker --loglevel=info`
-
-9. **Add Celery beat service:**
-   - New Service → GitHub repo (same repo)
-   - Override start command: `celery -A app.tasks.celery_app beat --loglevel=info`
-
-10. Your bot is live! The webhook is set automatically on startup.
-
----
-
-## Option 2: Render
-
-1. Go to [render.com](https://render.com) → New Web Service → connect GitHub repo
-
-2. Settings:
-   - **Runtime**: Docker
-   - **Start Command**: `uvicorn app.main:app --host 0.0.0.0 --port 8000`
-
-3. Add **PostgreSQL** database (Render free tier)
-
-4. Add **Redis** (Render free tier)
-
-5. Set environment variables in Render dashboard
-
-6. Add two separate Worker services for Celery worker and beat
-
-> Note: Render free tier spins down after 15 min inactivity. Use a paid plan ($7/mo) for a bot that must always be on.
-
----
-
-## Option 3: Fly.io
-
+**1. Push your code to GitHub**
 ```bash
-# Install flyctl
-brew install flyctl
-
-# Login
-fly auth login
-
-# Launch (auto-detects Dockerfile)
-fly launch
-
-# Set secrets
-fly secrets set TELEGRAM_BOT_TOKEN=your_token
-fly secrets set ANTHROPIC_API_KEY=your_key
-fly secrets set TELEGRAM_WEBHOOK_URL=https://your-app.fly.dev
-
-# Create Postgres
-fly postgres create --name drax-db
-fly postgres attach drax-db
-
-# Create Redis
-fly redis create
-
-# Deploy
-fly deploy
+git remote add origin https://github.com/YOUR_USERNAME/drax.git
+git push -u origin main
 ```
 
+**2. Sign up at [railway.app](https://railway.app)** with your GitHub account
+
+**3. Create a new project**
+- Click **New Project** → **Deploy from GitHub repo**
+- Select your Drax repository
+- Railway detects the Dockerfile and starts building
+
+**4. Add PostgreSQL**
+- In your project, click **+ New** → **Database** → **PostgreSQL**
+- Railway automatically adds `DATABASE_URL` to your environment
+
+**5. Add Redis**
+- Click **+ New** → **Database** → **Redis**
+- Railway automatically adds `REDIS_URL`
+
+**6. Set environment variables**
+
+Click on your web service → **Variables** tab → add these:
+
+```
+TELEGRAM_BOT_TOKEN=your_token_here
+LLM_PROVIDER=claude
+ANTHROPIC_API_KEY=your_key_here
+TELEGRAM_WEBHOOK_URL=https://YOUR-APP-NAME.railway.app
+SECRET_KEY=generate_any_random_string_here
+DEBUG=false
+```
+
+Optional (for accurate nutrition and workout videos):
+```
+NUTRITIONIX_APP_ID=your_app_id
+NUTRITIONIX_API_KEY=your_key
+YOUTUBE_API_KEY=your_key
+```
+
+**7. Add Celery worker** (handles the 5 AM messages and reminders)
+- Click **+ New** → **GitHub Repo** → same repo
+- Under **Settings** → **Deploy** → set **Custom Start Command**:
+  ```
+  celery -A app.tasks.celery_app worker --loglevel=info --concurrency=2
+  ```
+- Add the same environment variables
+
+**8. Add Celery beat** (the clock that triggers scheduled tasks)
+- Click **+ New** → **GitHub Repo** → same repo
+- Set **Custom Start Command**:
+  ```
+  celery -A app.tasks.celery_app beat --loglevel=info
+  ```
+- Add the same environment variables
+
+**9. Done.** Your bot is live. Every `git push` to main triggers an automatic redeploy.
+
+### Railway costs
+
+| What | Free credit |
+|---|---|
+| Web service | ~$0.50–1/month |
+| Celery worker | ~$0.50–1/month |
+| Celery beat | ~$0.20/month |
+| PostgreSQL (1GB) | ~$1/month |
+| Redis | ~$0.50/month |
+| **Total** | **~$3–4/month** (within $5 free credit) |
+
 ---
 
-## Option 4: VPS (Hetzner CX22 — €3.29/mo, best value)
+## Option 2: Hetzner VPS (Best value for long-term)
 
-### 1. Get a server
-- [Hetzner Cloud](https://hetzner.com/cloud) → CX22 (2 vCPU, 4GB RAM) → Ubuntu 24.04
-- Note your server IP
+A Hetzner CX22 (2 vCPU, 4 GB RAM) at €3.29/month runs all 5 Docker services comfortably. This is the best long-term option — you own everything and have full control.
 
-### 2. Point a domain (optional but recommended for webhook)
-- Add an A record: `drax.yourdomain.com → YOUR_SERVER_IP`
+### Step-by-step
 
-### 3. SSH and set up
+**1. Create a server**
+- Go to [hetzner.com/cloud](https://hetzner.com/cloud) → New Server
+- Select **CX22** (2 vCPU, 4 GB RAM) → **Ubuntu 24.04** → cheapest datacenter near you
+- Add an SSH key for access
+- Note the server IP address
+
+**2. (Optional) Point a domain**
+
+A domain is recommended because Telegram webhooks require HTTPS. You can get a free subdomain or use your own.
+
+```
+A record:  drax.yourdomain.com  →  YOUR_SERVER_IP
+```
+
+If you don't have a domain, use polling mode instead (set `TELEGRAM_WEBHOOK_URL=` blank).
+
+**3. SSH into your server**
 ```bash
 ssh root@YOUR_SERVER_IP
+```
 
-# Install Docker
+**4. Install Docker**
+```bash
 curl -fsSL https://get.docker.com | sh
-apt install -y docker-compose-plugin nginx certbot python3-certbot-nginx
+apt install -y docker-compose-plugin
+```
 
-# Clone your repo
+**5. Clone your repo**
+```bash
 git clone https://github.com/YOUR_USERNAME/drax.git
 cd drax
+```
 
-# Configure environment
+**6. Configure environment**
+```bash
 cp .env.example .env
-nano .env  # fill in your keys + set TELEGRAM_WEBHOOK_URL=https://drax.yourdomain.com
+nano .env
+```
 
-# Start everything
+Fill in your keys. If you have a domain:
+```
+TELEGRAM_WEBHOOK_URL=https://drax.yourdomain.com
+```
+
+If no domain (polling mode):
+```
+TELEGRAM_WEBHOOK_URL=
+```
+
+**7. Start everything**
+```bash
 docker compose up -d
 ```
 
-### 4. SSL certificate (required for webhook)
-```bash
-certbot --nginx -d drax.yourdomain.com
-```
+This starts 5 services: db, redis, web, celery_worker, celery_beat.
 
-### 5. Nginx config
-```nginx
+**8. SSL with Nginx (only needed if using webhook)**
+```bash
+apt install -y nginx certbot python3-certbot-nginx
+
+# Create Nginx config
+cat > /etc/nginx/sites-available/drax << 'EOF'
 server {
     server_name drax.yourdomain.com;
     location / {
@@ -148,33 +170,116 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
     }
 }
+EOF
+
+ln -s /etc/nginx/sites-available/drax /etc/nginx/sites-enabled/
+nginx -t && systemctl reload nginx
+
+# Get SSL certificate (free via Let's Encrypt)
+certbot --nginx -d drax.yourdomain.com
+```
+
+**9. Auto-restart on server reboot**
+```bash
+docker compose up -d --restart always
+# Or set restart: always in docker-compose.yml (already done)
+```
+
+**Updating after code changes:**
+```bash
+cd drax
+git pull
+docker compose up -d --build
 ```
 
 ---
 
-## Switching from Polling to Webhook
+## Option 3: Render
 
-Once hosted, set `TELEGRAM_WEBHOOK_URL` in your `.env`:
-```
-TELEGRAM_WEBHOOK_URL=https://your-domain.com
-```
+**Pros:** Free tier available, simple UI
+**Cons:** Free tier spins down after 15 min inactivity (bad for a bot that sends 5 AM messages)
 
-The app automatically registers the webhook on startup via:
-```python
-await application.bot.set_webhook(url=f"{settings.telegram_webhook_url}/webhook")
-```
+**Use Render if:** You're willing to use a paid plan ($7/month for the web service).
 
-For local development, leave `TELEGRAM_WEBHOOK_URL` empty and use `python run_polling.py`.
+1. Go to [render.com](https://render.com) → New Web Service → connect GitHub repo
+2. Runtime: Docker
+3. Add **PostgreSQL** database (free tier, 1GB)
+4. Add **Redis** (free tier)
+5. Set environment variables
+6. Add two background worker services for Celery (worker + beat)
 
 ---
 
-## GitHub → Auto-Deploy Setup
-
-On Railway/Render/Fly.io, every `git push` to `main` triggers a new deployment automatically.
+## Option 4: Fly.io
 
 ```bash
-git add .
-git commit -m "feat: update workout timing"
-git push origin main
-# → Auto-deploys in ~2 minutes
+# Install
+brew install flyctl
+fly auth login
+
+# Launch (auto-detects Dockerfile)
+fly launch
+
+# Create and attach PostgreSQL
+fly postgres create --name drax-db
+fly postgres attach drax-db
+
+# Create Redis
+fly redis create --name drax-redis
+
+# Set secrets
+fly secrets set TELEGRAM_BOT_TOKEN=your_token
+fly secrets set ANTHROPIC_API_KEY=your_key
+fly secrets set TELEGRAM_WEBHOOK_URL=https://your-app.fly.dev
+
+# Deploy
+fly deploy
+```
+
+For Celery worker and beat, create separate apps or use Fly Machines.
+
+---
+
+## Polling vs Webhook
+
+| Mode | When to use | How |
+|---|---|---|
+| **Polling** | Local dev, no domain | Leave `TELEGRAM_WEBHOOK_URL` blank. Run `python run_polling.py` |
+| **Webhook** | Production, hosted | Set `TELEGRAM_WEBHOOK_URL=https://your-domain.com`. The app registers it on startup |
+
+On Railway/Render/Fly, use webhook mode — it's more efficient and reliable.
+
+---
+
+## After deploying — run the database migrations
+
+```bash
+# Railway: use the Railway shell in the dashboard
+# VPS/Fly: SSH into the web container
+
+alembic upgrade head
+```
+
+Or add this to your startup command in the Dockerfile/Procfile:
+```bash
+alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+---
+
+## Monitoring
+
+Check logs on Railway:
+- Dashboard → your service → **Deployments** → **View Logs**
+
+Check logs on VPS:
+```bash
+docker compose logs -f web
+docker compose logs -f celery_worker
+```
+
+If Celery tasks aren't running (no 5 AM messages), check:
+```bash
+docker compose logs celery_beat
+docker compose logs celery_worker
 ```
