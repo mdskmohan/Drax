@@ -1,5 +1,5 @@
 """
-FitBot — FastAPI Application Entry Point.
+Drax — FastAPI Application Entry Point.
 Handles webhook registration, database init, and Telegram bot lifecycle.
 """
 import logging
@@ -26,7 +26,7 @@ application = build_application()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup / shutdown lifecycle."""
-    logger.info("Starting FitBot...")
+    logger.info("Starting Drax...")
 
     # Init database
     await init_db()
@@ -44,18 +44,18 @@ async def lifespan(app: FastAPI):
     else:
         logger.warning("No TELEGRAM_WEBHOOK_URL set — run in polling mode instead")
 
-    logger.info("FitBot is live! 💪")
+    logger.info("Drax is live! 💪")
     yield
 
     # Shutdown
-    logger.info("Shutting down FitBot...")
+    logger.info("Shutting down Drax...")
     await application.stop()
     await application.shutdown()
 
 
 # ── FastAPI App ────────────────────────────────────────────────────────────────
 app = FastAPI(
-    title="FitBot API",
+    title="Drax API",
     description="AI Personal Fitness Coach via Telegram",
     version="1.0.0",
     lifespan=lifespan,
@@ -69,7 +69,7 @@ app.include_router(webhook_router)
 @app.get("/")
 async def root():
     return {
-        "service": "FitBot",
+        "service": "Drax",
         "status": "running",
         "description": "AI Personal Fitness Coach — Telegram Bot",
     }

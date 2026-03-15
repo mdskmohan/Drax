@@ -19,12 +19,12 @@ async def main():
     logger.info("Initializing database...")
     await init_db()
 
-    logger.info("Starting FitBot in polling mode...")
+    logger.info("Starting Drax in polling mode...")
     app = build_application()
 
     async with app:
         await app.start()
-        logger.info("FitBot is running! Send /start to your bot on Telegram.")
+        logger.info("Drax is running! Send /start to your bot on Telegram.")
         await app.updater.start_polling(drop_pending_updates=True)
         await app.updater.idle()
         await app.stop()

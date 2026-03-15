@@ -4,18 +4,18 @@ services:
   # ── PostgreSQL ────────────────────────────────────────────────────────────────
   db:
     image: postgres:15-alpine
-    container_name: fitbot_db
+    container_name: drax_db
     restart: unless-stopped
     environment:
-      POSTGRES_USER: fitbot
-      POSTGRES_PASSWORD: fitbot_pass
-      POSTGRES_DB: fitbot_db
+      POSTGRES_USER: drax
+      POSTGRES_PASSWORD: drax_pass
+      POSTGRES_DB: drax_db
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U fitbot"]
+      test: ["CMD-SHELL", "pg_isready -U drax"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -23,7 +23,7 @@ services:
   # ── Redis ─────────────────────────────────────────────────────────────────────
   redis:
     image: redis:7-alpine
-    container_name: fitbot_redis
+    container_name: drax_redis
     restart: unless-stopped
     ports:
       - "6379:6379"
@@ -38,7 +38,7 @@ services:
   # ── FastAPI Web App ───────────────────────────────────────────────────────────
   web:
     build: .
-    container_name: fitbot_web
+    container_name: drax_web
     restart: unless-stopped
     env_file: .env
     ports:
@@ -55,7 +55,7 @@ services:
   # ── Celery Worker ─────────────────────────────────────────────────────────────
   celery_worker:
     build: .
-    container_name: fitbot_celery_worker
+    container_name: drax_celery_worker
     restart: unless-stopped
     env_file: .env
     depends_on:
@@ -68,7 +68,7 @@ services:
   # ── Celery Beat (Scheduler) ───────────────────────────────────────────────────
   celery_beat:
     build: .
-    container_name: fitbot_celery_beat
+    container_name: drax_celery_beat
     restart: unless-stopped
     env_file: .env
     depends_on:

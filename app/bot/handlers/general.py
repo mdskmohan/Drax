@@ -21,7 +21,7 @@ nutrition_agent = NutritionAgent()
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "🏋️ *FitBot Commands*\n\n"
+        "🏋️ *Drax Commands*\n\n"
         "*/start* — Setup or return to main menu\n"
         "*/menu* — Show main menu\n"
         "*/plan* — Get today's full plan\n"

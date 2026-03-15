@@ -6,7 +6,7 @@ from celery.schedules import crontab
 from app.config import settings
 
 celery_app = Celery(
-    "fitbot",
+    "drax",
     broker=settings.redis_url,
     backend=settings.redis_url,
     include=["app.tasks.scheduled"],

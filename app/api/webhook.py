@@ -26,4 +26,4 @@ async def telegram_webhook(request: Request):
 
 @router.get("/health")
 async def health_check():
-    return {"status": "healthy", "service": "FitBot"}
+    return {"status": "healthy", "service": "Drax"}

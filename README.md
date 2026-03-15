@@ -1,8 +1,8 @@
-# 🏋️ FitBot — AI Personal Fitness Coach on Telegram
+# 🏋️ Drax — AI Personal Fitness Coach on Telegram
 
 > Lose weight, build strength, and transform your lifestyle — entirely through Telegram.
 
-FitBot is a fully open-source AI fitness coach powered by **Claude AI** that lives in your Telegram. It acts as your personal trainer, nutritionist, and accountability coach — all in one bot.
+Drax is a fully open-source AI fitness coach powered by **Claude AI** that lives in your Telegram. It acts as your personal trainer, nutritionist, and accountability coach — all in one bot.
 
 ---
 
@@ -44,8 +44,8 @@ Sunday   → Full weekly progress report
 
 ### 1. Clone the repo
 ```bash
-git clone https://github.com/YOUR_USERNAME/fitbot.git
-cd fitbot
+git clone https://github.com/YOUR_USERNAME/drax.git
+cd drax
 ```
 
 ### 2. Get your API keys
@@ -113,7 +113,7 @@ Agent     Agent      Agent
 ## 📁 Project Structure
 
 ```
-fitbot/
+drax/
 ├── app/
 │   ├── agents/          # 6 AI agents (fitness, nutrition, hydration, motivation, progress, recovery)
 │   ├── bot/

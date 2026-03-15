@@ -53,7 +53,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await session.commit()
 
             await update.message.reply_text(
-                "🏋️ *Welcome to FitBot — Your AI Personal Fitness Coach!*\n\n"
+                "🏋️ *Welcome to Drax — Your AI Personal Fitness Coach!*\n\n"
                 "I'm here to help you lose weight, build strength, and transform your life.\n\n"
                 "Let's get started with a quick setup (takes 2 minutes).\n\n"
                 "👋 What's your *full name*?",

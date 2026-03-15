@@ -1,12 +1,12 @@
-# Contributing to FitBot
+# Contributing to Drax
 
 Thank you for contributing! Here's how to get started.
 
 ## Setup for Development
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/fitbot.git
-cd fitbot
+git clone https://github.com/YOUR_USERNAME/drax.git
+cd drax
 python -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env   # fill in your keys

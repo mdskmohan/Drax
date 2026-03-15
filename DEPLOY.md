@@ -1,4 +1,4 @@
-# FitBot Deployment Guide
+# Drax Deployment Guide
 
 ## Hosting Options Comparison
 
@@ -21,7 +21,7 @@ Railway auto-detects Docker, provisions Postgres and Redis for free.
 
 2. **Go to [railway.app](https://railway.app)** → Sign up with GitHub
 
-3. **New Project → Deploy from GitHub repo** → select your fitbot repo
+3. **New Project → Deploy from GitHub repo** → select your drax repo
 
 4. **Add PostgreSQL:**
    - Click `+ New` → Database → PostgreSQL
@@ -92,8 +92,8 @@ fly secrets set ANTHROPIC_API_KEY=your_key
 fly secrets set TELEGRAM_WEBHOOK_URL=https://your-app.fly.dev
 
 # Create Postgres
-fly postgres create --name fitbot-db
-fly postgres attach fitbot-db
+fly postgres create --name drax-db
+fly postgres attach drax-db
 
 # Create Redis
 fly redis create
@@ -111,7 +111,7 @@ fly deploy
 - Note your server IP
 
 ### 2. Point a domain (optional but recommended for webhook)
-- Add an A record: `fitbot.yourdomain.com → YOUR_SERVER_IP`
+- Add an A record: `drax.yourdomain.com → YOUR_SERVER_IP`
 
 ### 3. SSH and set up
 ```bash
@@ -122,12 +122,12 @@ curl -fsSL https://get.docker.com | sh
 apt install -y docker-compose-plugin nginx certbot python3-certbot-nginx
 
 # Clone your repo
-git clone https://github.com/YOUR_USERNAME/fitbot.git
-cd fitbot
+git clone https://github.com/YOUR_USERNAME/drax.git
+cd drax
 
 # Configure environment
 cp .env.example .env
-nano .env  # fill in your keys + set TELEGRAM_WEBHOOK_URL=https://fitbot.yourdomain.com
+nano .env  # fill in your keys + set TELEGRAM_WEBHOOK_URL=https://drax.yourdomain.com
 
 # Start everything
 docker compose up -d
@@ -135,13 +135,13 @@ docker compose up -d
 
 ### 4. SSL certificate (required for webhook)
 ```bash
-certbot --nginx -d fitbot.yourdomain.com
+certbot --nginx -d drax.yourdomain.com
 ```
 
 ### 5. Nginx config
 ```nginx
 server {
-    server_name fitbot.yourdomain.com;
+    server_name drax.yourdomain.com;
     location / {
         proxy_pass http://localhost:8000;
         proxy_set_header Host $host;

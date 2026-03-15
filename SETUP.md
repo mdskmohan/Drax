@@ -1,10 +1,10 @@
-# FitBot — Complete Setup Guide
+# Drax — Complete Setup Guide
 
 ## Prerequisites
 - Python 3.11+
 - Docker + Docker Compose
 - Telegram Bot Token (from @BotFather)
-- DeepSeek API Key
+- Anthropic API Key
 - Nutritionix App ID + API Key (optional but recommended)
 - YouTube Data API Key (optional)
 
@@ -14,15 +14,15 @@
 
 1. Open Telegram → search `@BotFather`
 2. Send `/newbot`
-3. Choose a name: `My FitBot`
-4. Choose a username: `myfitbot_yourname_bot`
+3. Choose a name: `My Drax`
+4. Choose a username: `mydrax_yourname_bot`
 5. Copy the token → paste into `.env`
 
 ---
 
-## Step 2: Get Your DeepSeek API Key
+## Step 2: Get Your Anthropic API Key
 
-1. Go to https://platform.deepseek.com
+1. Go to https://console.anthropic.com
 2. Sign up / Log in
 3. API Keys → Create new key
 4. Copy it → paste into `.env`
@@ -58,9 +58,9 @@ nano .env
 Required keys:
 ```
 TELEGRAM_BOT_TOKEN=your_token_here
-DEEPSEEK_API_KEY=your_key_here
-DATABASE_URL=postgresql+asyncpg://fitbot:fitbot_pass@db:5432/fitbot_db
-DATABASE_SYNC_URL=postgresql://fitbot:fitbot_pass@db:5432/fitbot_db
+ANTHROPIC_API_KEY=your_key_here
+DATABASE_URL=postgresql+asyncpg://drax:drax_pass@db:5432/drax_db
+DATABASE_SYNC_URL=postgresql://drax:drax_pass@db:5432/drax_db
 REDIS_URL=redis://redis:6379/0
 ```
 
@@ -80,7 +80,7 @@ pip install -r requirements.txt
 docker-compose up db redis -d
 
 # Update .env to use localhost for local dev:
-# DATABASE_URL=postgresql+asyncpg://fitbot:fitbot_pass@localhost:5432/fitbot_db
+# DATABASE_URL=postgresql+asyncpg://drax:drax_pass@localhost:5432/drax_db
 # REDIS_URL=redis://localhost:6379/0
 
 # Run the bot in polling mode
@@ -203,7 +203,7 @@ Handlers                      Handlers
 
 **DeepSeek errors?**
 - Verify `DEEPSEEK_API_KEY` is valid
-- Check API quota at platform.deepseek.com
+- Check API quota at console.anthropic.com
 
 **Celery not scheduling?**
 - Ensure Redis is running: `docker-compose ps redis`
