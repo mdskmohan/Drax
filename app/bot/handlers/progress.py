@@ -114,25 +114,29 @@ async def generate_weekly_report(update: Update, context: ContextTypes.DEFAULT_T
 
         seven_days_ago = datetime.now(timezone.utc) - timedelta(days=7)
 
-        # Fetch all week data
+        # Fetch all week data — order_by ensures correct chronological trend analysis
         weights = (await session.execute(
             select(WeightLog).where(WeightLog.user_id == user_id)
             .where(WeightLog.logged_at >= seven_days_ago)
+            .order_by(WeightLog.logged_at)
         )).scalars().all()
 
         meals = (await session.execute(
             select(MealLog).where(MealLog.user_id == user_id)
             .where(MealLog.logged_at >= seven_days_ago)
+            .order_by(MealLog.logged_at)
         )).scalars().all()
 
         workouts = (await session.execute(
             select(WorkoutLog).where(WorkoutLog.user_id == user_id)
             .where(WorkoutLog.created_at >= seven_days_ago)
+            .order_by(WorkoutLog.created_at)
         )).scalars().all()
 
         waters = (await session.execute(
             select(WaterLog).where(WaterLog.user_id == user_id)
             .where(WaterLog.logged_at >= seven_days_ago)
+            .order_by(WaterLog.logged_at)
         )).scalars().all()
 
         week_data = {

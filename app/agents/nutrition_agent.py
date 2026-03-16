@@ -30,7 +30,7 @@ class NutritionAgent(BaseAgent):
         query = result.get("normalized_query", food_text)
         meal_type = result.get("meal_type", "snack")
 
-        nutrition = await parse_food_text(query)
+        nutrition = await parse_food_text(query, timezone=user.timezone or "UTC")
         nutrition["meal_type"] = meal_type
         nutrition["original_input"] = food_text
         return nutrition

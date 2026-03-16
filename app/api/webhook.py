@@ -26,4 +26,38 @@ async def telegram_webhook(request: Request):
 
 @router.get("/health")
 async def health_check():
-    return {"status": "healthy", "service": "Drax"}
+    """
+    Real health check — verifies database and Redis connectivity.
+    Returns 200 only if all critical dependencies are reachable.
+    """
+    from app.database import engine
+    from app.config import settings
+    checks = {}
+
+    # Database
+    try:
+        async with engine.connect() as conn:
+            await conn.execute(__import__("sqlalchemy").text("SELECT 1"))
+        checks["database"] = "ok"
+    except Exception as e:
+        logger.error(f"Health check: DB unreachable: {e}")
+        checks["database"] = "error"
+
+    # Redis (via Celery broker URL)
+    try:
+        import redis.asyncio as aioredis
+        r = aioredis.from_url(settings.redis_url, socket_connect_timeout=2)
+        await r.ping()
+        await r.aclose()
+        checks["redis"] = "ok"
+    except Exception as e:
+        logger.error(f"Health check: Redis unreachable: {e}")
+        checks["redis"] = "error"
+
+    all_ok = all(v == "ok" for v in checks.values())
+    http_status = status.HTTP_200_OK if all_ok else status.HTTP_503_SERVICE_UNAVAILABLE
+    from fastapi.responses import JSONResponse
+    return JSONResponse(
+        content={"status": "healthy" if all_ok else "degraded", "service": "Drax", "checks": checks},
+        status_code=http_status,
+    )

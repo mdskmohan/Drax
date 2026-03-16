@@ -63,6 +63,11 @@ from app.bot.handlers.notifications import (
     handle_notification_callback,
     process_notif_time_input,
 )
+from app.bot.handlers.privacy import (
+    privacy_command,
+    delete_my_data_command,
+    handle_delete_confirm_callback,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -72,42 +77,57 @@ async def route_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE)
     Central router for all text messages.
     Checks in-progress states first, then falls through to handlers.
     """
-    # Onboarding check
-    from sqlalchemy import select
-    from app.database import AsyncSessionLocal
-    from app.models.user import User, OnboardingState
+    try:
+        # Onboarding check
+        from sqlalchemy import select
+        from app.database import AsyncSessionLocal
+        from app.models.user import User, OnboardingState
 
-    user_id = update.effective_user.id
-    async with AsyncSessionLocal() as session:
-        result = await session.execute(select(User).where(User.id == user_id))
-        user = result.scalar_one_or_none()
-        if user and user.onboarding_state != OnboardingState.completed:
-            handled = await handle_onboarding_message(update, context)
-            if handled:
-                return
+        user_id = update.effective_user.id
+        async with AsyncSessionLocal() as session:
+            result = await session.execute(select(User).where(User.id == user_id))
+            user = result.scalar_one_or_none()
+            if user and user.onboarding_state != OnboardingState.completed:
+                handled = await handle_onboarding_message(update, context)
+                if handled:
+                    return
 
-    # State-based routing
-    if await process_notif_time_input(update, context):
-        return
-    if await process_weight_log(update, context):
-        return
-    if await process_water_text(update, context):
-        return
-    if await process_meal_text(update, context):
-        return
-    if await equipment_photo_handler(update, context):
-        return
-    if await process_pain_report(update, context):
-        return
+        # State-based routing
+        if await process_notif_time_input(update, context):
+            return
+        if await process_weight_log(update, context):
+            return
+        if await process_water_text(update, context):
+            return
+        if await process_meal_text(update, context):
+            return
+        if await equipment_photo_handler(update, context):
+            return
+        if await process_pain_report(update, context):
+            return
 
-    # Fallback
-    await unknown_message_handler(update, context)
+        # Fallback
+        await unknown_message_handler(update, context)
+
+    except Exception as e:
+        logger.error(f"Unhandled error for user {update.effective_user.id}: {e}", exc_info=True)
+        try:
+            await update.message.reply_text(
+                "❌ Something went wrong. Please try again, or use /menu to restart."
+            )
+        except Exception:
+            pass
 
 
 async def route_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Central callback query router."""
     query = update.callback_query
     data = query.data
+
+    # Data deletion confirmation
+    if data == "confirm_delete_data":
+        await handle_delete_confirm_callback(update, context)
+        return
 
     # Notification settings callbacks
     if data.startswith("notif_"):
@@ -193,6 +213,8 @@ def build_application() -> Application:
     app.add_handler(CommandHandler("equipment", equipment_command))
     app.add_handler(CommandHandler("sync", sync_command))
     app.add_handler(CommandHandler("notifications", notifications_command))
+    app.add_handler(CommandHandler("privacy", privacy_command))
+    app.add_handler(CommandHandler("delete_my_data", delete_my_data_command))
 
     # Photos — equipment detection first, then food photo fallback
     async def route_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):

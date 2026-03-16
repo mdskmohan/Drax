@@ -17,7 +17,7 @@ _headers = {
 }
 
 
-async def parse_food_text(food_text: str) -> dict:
+async def parse_food_text(food_text: str, timezone: str = "UTC") -> dict:
     """
     Parse natural language food description into nutrition data.
     Returns dict with: foods list, total calories, protein, carbs, fat.
@@ -29,7 +29,7 @@ async def parse_food_text(food_text: str) -> dict:
         resp = await client.post(
             NUTRITIONIX_NLP_URL,
             headers=_headers,
-            json={"query": food_text, "timezone": "Asia/Kolkata"},
+            json={"query": food_text, "timezone": timezone},
         )
         if resp.status_code != 200:
             return _mock_nutrition(food_text)

@@ -1,8 +1,13 @@
 """Add new features: macros, gym schedule, equipment, health sync, language
 
 Revision ID: 002
-Revises: 001
+Revises: (none — base tables are created by SQLAlchemy init_db on first run)
 Create Date: 2026-03-16
+
+NOTE: This is the first Alembic migration. Core tables (users, meal_logs, etc.)
+are created by `init_db()` via SQLAlchemy metadata.create_all() on startup.
+This migration only adds new columns to the existing users table and extends
+the onboarding_state enum.
 """
 from alembic import op
 import sqlalchemy as sa
