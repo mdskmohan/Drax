@@ -100,12 +100,50 @@ You need **at minimum** a Telegram Bot Token + one LLM key. Everything else is o
 
 #### Optional add-ons
 
-| Service | Why | Free tier | Where |
-|---|---|---|---|
-| Nutritionix | Accurate calorie + macro data | 500 calls/day | [developer.nutritionix.com](https://developer.nutritionix.com) |
-| YouTube API | Exercise tutorial videos in workouts | 10,000 units/day | [Google Cloud Console](https://console.cloud.google.com) → YouTube Data API v3 |
+Both of these are free within daily limits. Neither is required — Drax works without them.
 
-> Without these, Drax still works — it estimates nutrition via LLM and generates workouts without video links.
+---
+
+**Nutritionix** *(optional — accurate calorie and macro data)*
+
+Without it: Drax estimates nutrition using the LLM (less precise, but functional).
+With it: calories, protein, carbs, and fat are looked up from a database of 800k+ foods.
+
+Free tier: **500 API calls/day** (enough for personal use)
+
+1. Go to [developer.nutritionix.com](https://developer.nutritionix.com)
+2. Click **Sign Up** → create a free account
+3. After logging in, go to **Dashboard** → your app is created automatically
+4. Copy your **App ID** and **API Key**
+5. Paste into `.env`:
+   ```
+   NUTRITIONIX_APP_ID=your_app_id_here
+   NUTRITIONIX_API_KEY=your_api_key_here
+   ```
+
+---
+
+**YouTube Data API v3** *(optional — exercise tutorial video links in workouts)*
+
+Without it: workouts are generated without video links.
+With it: each workout includes clickable YouTube tutorial links for the main exercises.
+
+Free tier: **10,000 units/day** (more than enough for personal use)
+
+1. Go to [console.cloud.google.com](https://console.cloud.google.com)
+2. Click **Select a project** → **New Project** → give it any name → **Create**
+3. In the left menu go to **APIs & Services** → **Library**
+4. Search for **YouTube Data API v3** → click it → click **Enable**
+5. Go to **APIs & Services** → **Credentials** → **+ Create Credentials** → **API key**
+6. Copy the generated key
+7. Paste into `.env`:
+   ```
+   YOUTUBE_API_KEY=your_api_key_here
+   ```
+
+---
+
+> **Summary:** Telegram Bot Token + one LLM key = bot fully works. Nutritionix and YouTube just make it better.
 
 ### Step 3 — Configure environment
 
