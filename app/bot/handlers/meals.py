@@ -88,13 +88,13 @@ async def process_meal_text(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 
 
 async def process_meal_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Process a food photo — use caption as description or AI vision."""
+    """Process a food photo using vision AI to detect food and estimate nutrition."""
     user_id = update.effective_user.id
     photo = update.message.photo[-1]  # highest resolution
-    caption = update.message.caption or "food in the photo"
+    caption = update.message.caption or ""
 
     processing_msg = await update.message.reply_text(
-        "📷 Analyzing your food photo..."
+        "📷 Analyzing your food photo with AI... 🔍"
     )
 
     async with AsyncSessionLocal() as session:
@@ -104,14 +104,22 @@ async def process_meal_photo(update: Update, context: ContextTypes.DEFAULT_TYPE)
             await processing_msg.edit_text("Please /start first.")
             return
 
-        # Use caption or a basic description for Nutritionix lookup
-        food_description = caption if caption != "food in the photo" else "mixed food plate"
-        nutrition = await nutrition_agent.parse_meal(user, food_description)
+        # Download the photo bytes from Telegram
+        photo_file = await context.bot.get_file(photo.file_id)
+        import io
+        buf = io.BytesIO()
+        await photo_file.download_to_memory(buf)
+        image_bytes = buf.getvalue()
+
+        # Use vision AI to detect food
+        nutrition = await nutrition_agent.analyze_food_photo(user, image_bytes, caption)
+        detected_desc = nutrition.get("detected_description", caption or "food photo")
+        meal_type = context.user_data.pop("pending_meal_type", "snack")
 
         meal_log = MealLog(
             user_id=user_id,
-            meal_type=context.user_data.pop("pending_meal_type", "snack"),
-            food_description=food_description,
+            meal_type=meal_type,
+            food_description=detected_desc,
             parsed_foods=nutrition.get("foods", []),
             calories=nutrition.get("total_calories", 0),
             protein_g=nutrition.get("total_protein_g", 0),
@@ -124,11 +132,17 @@ async def process_meal_photo(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await session.commit()
 
         cal = nutrition.get("total_calories", 0)
+        protein = nutrition.get("total_protein_g", 0)
+        carbs = nutrition.get("total_carbs_g", 0)
+        fat = nutrition.get("total_fat_g", 0)
+
         await processing_msg.edit_text(
-            f"📷 *Food photo logged!*\n\n"
-            f"Detected: _{food_description}_\n"
-            f"🔥 Estimated calories: *{cal:.0f} kcal*\n\n"
-            f"_Tip: Add a caption to your photo for more accurate tracking!_",
+            f"📷 *Food photo analyzed!*\n\n"
+            f"🔍 Detected: _{detected_desc}_\n\n"
+            f"📊 *Estimated Nutrition:*\n"
+            f"🔥 Calories: *{cal:.0f} kcal*\n"
+            f"💪 Protein: {protein:.1f}g  🌾 Carbs: {carbs:.1f}g  🧈 Fat: {fat:.1f}g\n\n"
+            f"_Not accurate? Add a caption to your photo for better results._",
             parse_mode="Markdown",
             reply_markup=main_menu_keyboard(),
         )

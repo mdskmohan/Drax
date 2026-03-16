@@ -63,7 +63,9 @@ app = FastAPI(
 
 # Register routes
 from app.api.webhook import router as webhook_router  # noqa
+from app.api.health_sync_api import router as health_sync_router  # noqa
 app.include_router(webhook_router)
+app.include_router(health_sync_router)
 
 
 @app.get("/")

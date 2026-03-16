@@ -1,4 +1,4 @@
-from sqlalchemy import Column, BigInteger, String, Float, Integer, Boolean, DateTime, Enum as SAEnum
+from sqlalchemy import Column, BigInteger, String, Float, Integer, Boolean, DateTime, Enum as SAEnum, JSON
 from sqlalchemy.sql import func
 import enum
 from app.database import Base
@@ -30,6 +30,9 @@ class OnboardingState(str, enum.Enum):
     collecting_diet = "collecting_diet"
     collecting_workout_level = "collecting_workout_level"
     collecting_gym_days = "collecting_gym_days"
+    collecting_gym_schedule = "collecting_gym_schedule"
+    collecting_equipment = "collecting_equipment"
+    collecting_language = "collecting_language"
     completed = "completed"
 
 
@@ -43,21 +46,35 @@ class User(Base):
 
     # Physical profile
     age = Column(Integer, nullable=True)
-    gender = Column(String(10), nullable=True)          # male / female
+    gender = Column(String(10), nullable=True)
     height_cm = Column(Float, nullable=True)
     current_weight_kg = Column(Float, nullable=True)
     goal_weight_kg = Column(Float, nullable=True)
-    timeline_months = Column(Integer, nullable=True)    # e.g. 10
+    timeline_months = Column(Integer, nullable=True)
 
     # Preferences
     diet_preference = Column(SAEnum(DietPreference), default=DietPreference.omnivore)
     workout_level = Column(SAEnum(WorkoutLevel), default=WorkoutLevel.beginner)
-    gym_days_per_week = Column(Integer, default=3)      # days available for gym
+    gym_days_per_week = Column(Integer, default=3)
+    gym_schedule = Column(JSON, default=list)           # ["Monday", "Wednesday", "Friday"]
+    language = Column(String(10), default="en")         # en | hi | es | fr | ar | etc.
 
-    # Computed targets (set after onboarding)
+    # Computed targets
     daily_calorie_target = Column(Integer, nullable=True)
     daily_water_target_ml = Column(Integer, default=3000)
     weekly_weight_loss_target_kg = Column(Float, nullable=True)
+
+    # Macro targets (calculated after onboarding)
+    protein_target_g = Column(Integer, nullable=True)   # grams/day
+    carbs_target_g = Column(Integer, nullable=True)     # grams/day
+    fat_target_g = Column(Integer, nullable=True)       # grams/day
+
+    # Gym equipment
+    equipment_list = Column(JSON, default=list)         # ["barbell", "dumbbells", "cable machine", ...]
+    equipment_setup = Column(String(20), default="gym") # gym | home | bodyweight
+
+    # Apple Health / Google Health Connect sync
+    health_sync_token = Column(String(64), nullable=True, unique=True)
 
     # State
     onboarding_state = Column(
@@ -76,7 +93,6 @@ class User(Base):
 
     @property
     def bmr(self) -> float | None:
-        """Mifflin-St Jeor BMR calculation."""
         if not all([self.current_weight_kg, self.height_cm, self.age, self.gender]):
             return None
         if self.gender == "male":
@@ -85,7 +101,6 @@ class User(Base):
 
     @property
     def tdee(self) -> float | None:
-        """Total Daily Energy Expenditure (moderate activity)."""
         if self.bmr is None:
             return None
         multiplier = {
@@ -100,3 +115,10 @@ class User(Base):
         if self.current_weight_kg and self.goal_weight_kg:
             return self.current_weight_kg - self.goal_weight_kg
         return None
+
+    def calculate_macros(self):
+        """Calculate and set macro targets based on calorie goal (high-protein for fat loss)."""
+        cal = self.daily_calorie_target or 1800
+        self.protein_target_g = round(cal * 0.35 / 4)   # 35% protein
+        self.fat_target_g = round(cal * 0.30 / 9)        # 30% fat
+        self.carbs_target_g = round(cal * 0.35 / 4)      # 35% carbs

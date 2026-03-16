@@ -21,6 +21,27 @@ Be encouraging, specific, and science-based."""
 
 class FitnessCoachAgent(BaseAgent):
 
+    async def scan_equipment_from_photo(self, image_bytes: bytes) -> dict:
+        """Detect gym equipment from a photo using vision AI."""
+        prompt = (
+            "List all gym equipment you can see in this image. "
+            "Return JSON: {\"equipment\": [\"barbell\", \"dumbbells\", ...], \"setup_type\": \"gym|home|bodyweight\"}"
+        )
+        try:
+            result = await llm.vision(
+                image_bytes=image_bytes,
+                prompt=prompt,
+                system="You are a gym equipment expert. Identify equipment by its standard name.",
+            )
+            from app.services.llm import _parse_json
+            data = _parse_json(result)
+            return {
+                "equipment": data.get("equipment", []),
+                "setup_type": data.get("setup_type", "gym"),
+            }
+        except Exception:
+            return {"equipment": [], "setup_type": "gym"}
+
     async def generate_daily_workout(
         self,
         user: User,
@@ -28,17 +49,29 @@ class FitnessCoachAgent(BaseAgent):
         recent_workouts: list[dict] | None = None,
         is_gym_day: bool = True,
     ) -> dict:
-        # Return cached plan if already generated today (saves LLM cost on repeat /workout calls)
+        # Return cached plan if already generated today
         cache_key = (user.id, date.today(), day_of_week)
         if cache_key in _workout_cache:
             return _workout_cache[cache_key]
 
         recent_summary = f"\nRecent workouts: {recent_workouts}" if recent_workouts else ""
+
+        # Build equipment context
+        if user.equipment_list:
+            equipment_context = f"\nAvailable equipment: {', '.join(user.equipment_list)}"
+        elif hasattr(user, 'equipment_setup') and user.equipment_setup == "home":
+            equipment_context = "\nAvailable equipment: dumbbells, resistance bands, bodyweight only"
+        elif hasattr(user, 'equipment_setup') and user.equipment_setup == "bodyweight":
+            equipment_context = "\nAvailable equipment: bodyweight only, no equipment"
+        else:
+            equipment_context = ""
+
         messages = [
             {
                 "role": "user",
                 "content": f"""Generate a complete {day_of_week} workout plan.
-Is gym day: {is_gym_day}{recent_summary}
+Is gym day: {is_gym_day}{recent_summary}{equipment_context}
+Customize ALL exercises based on available equipment above.
 
 Return JSON with this exact structure:
 {{

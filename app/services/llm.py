@@ -95,6 +95,48 @@ class LLMService:
         )
         return _parse_json(raw)
 
+    async def vision(self, image_bytes: bytes, prompt: str, system: str = "") -> str:
+        """Analyze an image. Uses main model (supports vision for all providers)."""
+        import base64
+        b64 = base64.b64encode(image_bytes).decode()
+
+        if self.provider == "claude":
+            client = self._get_anthropic_client()
+            kwargs: dict = {
+                "model": self.main_model,
+                "max_tokens": 1024,
+                "messages": [{
+                    "role": "user",
+                    "content": [
+                        {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": b64}},
+                        {"type": "text", "text": prompt},
+                    ],
+                }],
+            }
+            if system:
+                kwargs["system"] = system
+            response = await client.messages.create(**kwargs)
+            return response.content[0].text
+        else:
+            # OpenAI and DeepSeek vision-compatible format
+            client = self._get_openai_client()
+            full_messages = []
+            if system:
+                full_messages.append({"role": "system", "content": system})
+            full_messages.append({
+                "role": "user",
+                "content": [
+                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}"}},
+                    {"type": "text", "text": prompt},
+                ],
+            })
+            response = await client.chat.completions.create(
+                model=self.main_model,
+                messages=full_messages,
+                max_tokens=1024,
+            )
+            return response.choices[0].message.content
+
     # ── Internal routing ───────────────────────────────────────────────────────
 
     async def _call(

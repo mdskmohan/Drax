@@ -5,10 +5,24 @@ All agents inherit from this.
 from app.models.user import User
 
 
+_LANGUAGE_NAMES = {
+    "hi": "Hindi",
+    "es": "Spanish",
+    "fr": "French",
+    "ar": "Arabic",
+    "de": "German",
+}
+
+
 class BaseAgent:
     def _system_str(self, role: str, user: User) -> str:
         """Return a combined system prompt string for Claude's system= parameter."""
-        return f"{role}\n\nUSER PROFILE:\n{self._user_context(user)}"
+        base = f"{role}\n\nUSER PROFILE:\n{self._user_context(user)}"
+        lang = getattr(user, "language", "en") or "en"
+        if lang != "en" and lang in _LANGUAGE_NAMES:
+            lang_name = _LANGUAGE_NAMES[lang]
+            base += f"\n\nIMPORTANT: Respond in {lang_name} language."
+        return base
 
     def _user_context(self, user: User) -> str:
         """Build a standard user profile context string for prompts."""

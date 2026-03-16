@@ -22,6 +22,10 @@ def main_menu_keyboard() -> InlineKeyboardMarkup:
         ],
         [
             InlineKeyboardButton("💪 Motivation", callback_data="motivation"),
+            InlineKeyboardButton("⚙️ Equipment", callback_data="equipment"),
+        ],
+        [
+            InlineKeyboardButton("📱 Health Sync", callback_data="sync"),
             InlineKeyboardButton("⚙️ Settings", callback_data="settings"),
         ],
     ])
@@ -124,6 +128,102 @@ def gym_days_keyboard() -> InlineKeyboardMarkup:
             InlineKeyboardButton("5 days", callback_data="gym_5"),
             InlineKeyboardButton("6 days", callback_data="gym_6"),
         ],
+    ])
+
+
+# ── Language Selection ─────────────────────────────────────────────────────────
+
+def language_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("🇬🇧 English", callback_data="lang_en"),
+            InlineKeyboardButton("🇮🇳 Hindi", callback_data="lang_hi"),
+        ],
+        [
+            InlineKeyboardButton("🇪🇸 Spanish", callback_data="lang_es"),
+            InlineKeyboardButton("🇫🇷 French", callback_data="lang_fr"),
+        ],
+        [
+            InlineKeyboardButton("🇦🇪 Arabic", callback_data="lang_ar"),
+            InlineKeyboardButton("🇩🇪 German", callback_data="lang_de"),
+        ],
+        [InlineKeyboardButton("🌐 Other (English)", callback_data="lang_en")],
+    ])
+
+
+# ── Equipment Setup Type ───────────────────────────────────────────────────────
+
+def equipment_setup_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("🏋️ Full Gym (machines + free weights)", callback_data="equip_setup_gym")],
+        [InlineKeyboardButton("🏠 Home Gym (limited equipment)", callback_data="equip_setup_home")],
+        [InlineKeyboardButton("💪 Bodyweight Only (no equipment)", callback_data="equip_setup_bodyweight")],
+        [InlineKeyboardButton("📷 Send Photo of Your Equipment", callback_data="equip_setup_photo")],
+    ])
+
+
+# ── Equipment Selection (home/gym specific items) ─────────────────────────────
+
+def equipment_selection_keyboard(selected: list[str]) -> InlineKeyboardMarkup:
+    """Multi-select equipment keyboard. Selected items show a checkmark."""
+    all_equipment = [
+        ("🏋️ Barbell", "barbell"),
+        ("💪 Dumbbells", "dumbbells"),
+        ("⚙️ Cable Machine", "cable machine"),
+        ("🦾 Smith Machine", "smith machine"),
+        ("🔩 Resistance Bands", "resistance bands"),
+        ("⚽ Kettlebells", "kettlebells"),
+        ("🏊 Pull-up Bar", "pull-up bar"),
+        ("🪑 Bench", "bench"),
+        ("🔄 Lat Pulldown", "lat pulldown"),
+        ("🦵 Leg Press", "leg press"),
+        ("🏃 Treadmill", "treadmill"),
+        ("🚴 Stationary Bike", "stationary bike"),
+    ]
+    rows = []
+    for i in range(0, len(all_equipment), 2):
+        row = []
+        for label, key in all_equipment[i:i+2]:
+            is_selected = key in selected
+            btn_label = f"✅ {label}" if is_selected else label
+            row.append(InlineKeyboardButton(btn_label, callback_data=f"equip_toggle_{key}"))
+        rows.append(row)
+    rows.append([InlineKeyboardButton("✅ Done — Save Equipment", callback_data="equip_done")])
+    return InlineKeyboardMarkup(rows)
+
+
+# ── Gym Schedule (day selection) ───────────────────────────────────────────────
+
+def gym_schedule_keyboard(selected_days: list[str]) -> InlineKeyboardMarkup:
+    """Multi-select day keyboard for gym schedule."""
+    days = [
+        ("Mon", "Monday"), ("Tue", "Tuesday"), ("Wed", "Wednesday"),
+        ("Thu", "Thursday"), ("Fri", "Friday"), ("Sat", "Saturday"), ("Sun", "Sunday"),
+    ]
+    row1 = []
+    row2 = []
+    for i, (short, full) in enumerate(days):
+        is_selected = full in selected_days
+        label = f"✅{short}" if is_selected else short
+        btn = InlineKeyboardButton(label, callback_data=f"schedule_{full}")
+        if i < 4:
+            row1.append(btn)
+        else:
+            row2.append(btn)
+    return InlineKeyboardMarkup([
+        row1, row2,
+        [InlineKeyboardButton("✅ Done — Save Schedule", callback_data="schedule_done")],
+    ])
+
+
+# ── Health Sync ────────────────────────────────────────────────────────────────
+
+def health_sync_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("📱 Apple Health Setup Guide", callback_data="sync_apple")],
+        [InlineKeyboardButton("🤖 Android Health Connect Guide", callback_data="sync_android")],
+        [InlineKeyboardButton("🔗 My Sync URL & Token", callback_data="sync_token")],
+        [InlineKeyboardButton("❌ Cancel", callback_data="cancel")],
     ])
 
 

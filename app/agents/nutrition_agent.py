@@ -32,6 +32,32 @@ class NutritionAgent(BaseAgent):
         nutrition["original_input"] = food_text
         return nutrition
 
+    async def analyze_food_photo(self, user: User, image_bytes: bytes, caption: str = "") -> dict:
+        """
+        Use vision AI to identify food in a photo, then fetch nutrition data.
+        Falls back to caption if vision fails.
+        """
+        caption_hint = f" Caption: '{caption}'" if caption else ""
+        prompt = (
+            f"Identify all food items visible in this photo.{caption_hint} "
+            "List each item with estimated quantity (e.g., '2 boiled eggs', '1 cup white rice', '150g chicken breast'). "
+            "Return ONLY a comma-separated list of food items with quantities. No explanation."
+        )
+        try:
+            detected = await llm.vision(
+                image_bytes=image_bytes,
+                prompt=prompt,
+                system="You are a food identification expert. Be precise about portions and quantities.",
+            )
+            food_description = detected.strip() if detected else (caption or "mixed food plate")
+        except Exception:
+            food_description = caption or "mixed food plate"
+
+        nutrition = await self.parse_meal(user, food_description)
+        nutrition["detected_from_photo"] = True
+        nutrition["detected_description"] = food_description
+        return nutrition
+
     async def get_meal_feedback(self, user: User, meal_description: str, nutrition: dict, daily_calories_so_far: float) -> str:
         remaining = (user.daily_calorie_target or 2000) - daily_calories_so_far
         return await llm.fast(

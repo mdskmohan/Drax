@@ -50,6 +50,14 @@ from app.bot.handlers.general import (
     motivation_command,
     unknown_message_handler,
 )
+from app.bot.handlers.equipment import (
+    equipment_command,
+    equipment_setup_callback,
+    equipment_toggle_callback,
+    equipment_done_callback,
+    equipment_photo_handler,
+)
+from app.bot.handlers.health_sync import sync_command, sync_callback
 
 logger = logging.getLogger(__name__)
 
@@ -80,6 +88,8 @@ async def route_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return
     if await process_meal_text(update, context):
         return
+    if await equipment_photo_handler(update, context):
+        return
     if await process_pain_report(update, context):
         return
 
@@ -93,9 +103,12 @@ async def route_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = query.data
 
     # Onboarding callbacks
-    if data.startswith(("gender_", "diet_", "level_", "gym_")):
-        await handle_onboarding_callback(update, context)
-        return
+    if data.startswith(("gender_", "diet_", "level_", "gym_", "schedule_", "lang_")) or \
+       (data.startswith(("equip_", "equip_setup_", "equip_toggle_", "equip_done")) and
+        context.user_data.get("equipment_onboarding")):
+        handled = await handle_onboarding_callback(update, context)
+        if handled:
+            return
 
     # Main menu
     if data == "log_meal":
@@ -112,6 +125,16 @@ async def route_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await daily_plan_command(update, context)
     elif data == "motivation":
         await motivation_command(update, context)
+    elif data == "equipment":
+        await equipment_command(update, context)
+    elif data.startswith("equip_setup_"):
+        await equipment_setup_callback(update, context)
+    elif data.startswith("equip_toggle_"):
+        await equipment_toggle_callback(update, context)
+    elif data == "equip_done":
+        await equipment_done_callback(update, context)
+    elif data == "sync" or data.startswith("sync_"):
+        await sync_callback(update, context)
 
     # Meal type selection
     elif data.startswith("meal_"):
@@ -151,9 +174,16 @@ def build_application() -> Application:
     app.add_handler(CommandHandler("progress", show_progress))
     app.add_handler(CommandHandler("report", generate_weekly_report))
     app.add_handler(CommandHandler("motivation", motivation_command))
+    app.add_handler(CommandHandler("equipment", equipment_command))
+    app.add_handler(CommandHandler("sync", sync_command))
 
-    # Photos (food photos)
-    app.add_handler(MessageHandler(filters.PHOTO, process_meal_photo))
+    # Photos — equipment detection first, then food photo fallback
+    async def route_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if await equipment_photo_handler(update, context):
+            return
+        await process_meal_photo(update, context)
+
+    app.add_handler(MessageHandler(filters.PHOTO, route_photo))
 
     # All text messages go through central router
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, route_text_message))
