@@ -15,6 +15,7 @@ from app.models.workout_log import WorkoutLog
 from app.agents.progress_agent import ProgressAgent
 from app.graph import drax_graph
 from app.bot.keyboards import main_menu_keyboard
+from app.bot.handlers.parsers import parse_weight_kg
 
 
 progress_agent = ProgressAgent()  # kept for generate_weekly_report
@@ -27,13 +28,13 @@ async def log_weight_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer()
         await query.edit_message_text(
             "⚖️ *Log Your Weight*\n\n"
-            "Enter your current weight in kg:\n\n"
-            "_e.g., 89.5_",
+            "Enter your current weight:\n\n"
+            "_e.g., 89.5kg or 197 lbs_",
             parse_mode="Markdown",
         )
     else:
         await update.message.reply_text(
-            "⚖️ *Log Your Weight*\n\nEnter your weight in kg:",
+            "⚖️ *Log Your Weight*\n\nEnter your weight (e.g., 89.5kg or 197 lbs):",
             parse_mode="Markdown",
         )
     context.user_data["awaiting_weight"] = True
@@ -48,11 +49,15 @@ async def process_weight_log(update: Update, context: ContextTypes.DEFAULT_TYPE)
     user_id = update.effective_user.id
     context.user_data.pop("awaiting_weight", None)
 
+    # Normalise lbs → kg before passing to graph
+    kg, label = parse_weight_kg(text)
+    graph_input = f"{kg} kg" if kg else text
+
     processing_msg = await update.message.reply_text("⚖️ Logging your weight...")
 
     result = await drax_graph.ainvoke({
         "user_id": user_id,
-        "user_input": text,
+        "user_input": graph_input,
         "intent": "log_weight",
     })
 

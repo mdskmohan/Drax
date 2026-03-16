@@ -179,14 +179,17 @@ When a new user sends `/start`, Drax walks through a short setup to personalise 
  ├─ 4. Gender  [Male] [Female]
  │       Used for Mifflin-St Jeor BMR formula
  │
- ├─ 5. Height in cm
- │       "What's your height in cm? (e.g., 175)"
+ ├─ 5. Height
+ │       "What's your height? (e.g., 175cm or 5'10\")"
+ │       Accepts: cm, feet/inches (5'11", 5ft 10in, 5 feet 10 inches)
  │
- ├─ 6. Current weight in kg
- │       "What's your current weight? (e.g., 95.5)"
+ ├─ 6. Current weight
+ │       "What's your current weight? (e.g., 85kg or 187 lbs)"
+ │       Accepts: kg or lbs — stored internally in kg
  │
- ├─ 7. Goal weight in kg
- │       "What's your goal weight? (e.g., 75)"
+ ├─ 7. Goal weight
+ │       "What's your goal weight? (e.g., 75kg or 165 lbs)"
+ │       Accepts: kg or lbs
  │
  ├─ 8. Timeline
  │       "In how many months? (e.g., 10)"
@@ -265,7 +268,7 @@ You don't need to use commands for daily tracking. Just message the bot:
 | `"chicken biryani for lunch, medium portion"` | Logs as lunch — understands Indian and regional foods |
 | `"drank 1L of water"` | Logs 1000ml hydration |
 | `"2 glasses of water"` | Logs 500ml hydration |
-| `"I weigh 87.5 kg"` | Logs weight, shows progress bar and AI feedback |
+| `"I weigh 87.5 kg"` or `"193 lbs"` | Logs weight (kg or lbs accepted), shows progress bar and AI feedback |
 | `"sharp pain in my left knee"` | AI assesses, modifies workout to avoid the affected area |
 | `"motivate me"` or `"I need a push"` | Personalised motivational message |
 | `"what's my plan for today?"` | Full daily plan |
@@ -392,6 +395,7 @@ Celery + Redis (scheduled notifications)
 | Rest day message | ❌ | None | 4 pre-written rotations |
 | Progress bar | ❌ | None | Pure calculation |
 | Water amount parsing | ❌ | None | Regex: "500ml", "2 glasses" → ml |
+| Height/weight parsing | ❌ | None | Regex: "5'10\"", "187 lbs" → cm/kg |
 
 ### Standards & Methodology
 

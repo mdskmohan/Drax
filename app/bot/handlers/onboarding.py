@@ -10,6 +10,7 @@ from sqlalchemy import select
 
 from app.database import AsyncSessionLocal
 from app.models.user import User, OnboardingState
+from app.bot.handlers.parsers import parse_height_cm, parse_weight_kg
 from app.bot.keyboards import (
     gender_keyboard, diet_keyboard, workout_level_keyboard,
     gym_days_keyboard, gym_schedule_keyboard, equipment_setup_keyboard,
@@ -123,50 +124,53 @@ async def handle_onboarding_message(update: Update, context: ContextTypes.DEFAUL
                 await update.message.reply_text("Please enter a valid age (13–100)")
 
         elif state == OnboardingState.collecting_height:
-            try:
-                height = float(text.replace("cm", "").strip())
-                if not 100 <= height <= 250:
-                    raise ValueError
-                user.height_cm = height
+            cm, label = parse_height_cm(text)
+            if cm is None:
+                await update.message.reply_text(
+                    "Please enter your height in cm (e.g., 175) or feet/inches (e.g., 5'10\" or 5ft 10in)"
+                )
+            else:
+                user.height_cm = cm
                 user.onboarding_state = OnboardingState.collecting_weight
                 await session.commit()
                 await update.message.reply_text(
-                    "What is your *current weight* in kg? (e.g., 95.5)",
+                    f"Got it — *{label}* noted! ✅\n\n"
+                    "What is your *current weight*? (e.g., 85kg or 187 lbs)",
                     parse_mode="Markdown",
                 )
-            except ValueError:
-                await update.message.reply_text("Please enter height in cm (e.g., 175)")
 
         elif state == OnboardingState.collecting_weight:
-            try:
-                weight = float(text.replace("kg", "").strip())
-                if not 30 <= weight <= 300:
-                    raise ValueError
-                user.current_weight_kg = weight
+            kg, label = parse_weight_kg(text)
+            if kg is None:
+                await update.message.reply_text(
+                    "Please enter weight in kg (e.g., 85.5) or lbs (e.g., 187 lbs)"
+                )
+            else:
+                user.current_weight_kg = kg
                 user.onboarding_state = OnboardingState.collecting_goal_weight
                 await session.commit()
                 await update.message.reply_text(
-                    f"Got it — *{weight}kg* noted! 💪\n\nWhat is your *goal weight* in kg?",
+                    f"Got it — *{label}* noted! 💪\n\n"
+                    "What is your *goal weight*? (e.g., 75kg or 165 lbs)",
                     parse_mode="Markdown",
                 )
-            except ValueError:
-                await update.message.reply_text("Please enter weight in kg (e.g., 95.5)")
 
         elif state == OnboardingState.collecting_goal_weight:
-            try:
-                goal = float(text.replace("kg", "").strip())
-                if not 30 <= goal <= 300:
-                    raise ValueError
-                user.goal_weight_kg = goal
+            kg, label = parse_weight_kg(text)
+            if kg is None:
+                await update.message.reply_text(
+                    "Please enter goal weight in kg (e.g., 75) or lbs (e.g., 165 lbs)"
+                )
+            else:
+                user.goal_weight_kg = kg
                 user.onboarding_state = OnboardingState.collecting_timeline
                 await session.commit()
-                diff = round(user.current_weight_kg - goal, 1)
+                diff = round(user.current_weight_kg - kg, 1)
                 await update.message.reply_text(
-                    f"So you want to lose *{diff}kg*! 🎯\n\nIn how many months? (e.g., 10)",
+                    f"Goal: *{label}* — so you want to lose *{diff}kg*! 🎯\n\n"
+                    "In how many months? (e.g., 10)",
                     parse_mode="Markdown",
                 )
-            except ValueError:
-                await update.message.reply_text("Please enter goal weight in kg (e.g., 75)")
 
         elif state == OnboardingState.collecting_timeline:
             try:
@@ -224,7 +228,7 @@ async def handle_onboarding_callback(update: Update, context: ContextTypes.DEFAU
             user.onboarding_state = OnboardingState.collecting_height
             await session.commit()
             await query.edit_message_text(
-                f"Got it! ✅\n\nWhat is your *height* in cm? (e.g., 175)",
+                "Got it! ✅\n\nWhat is your *height*? (e.g., 175cm or 5'10\")",
                 parse_mode="Markdown",
             )
             return True
@@ -432,9 +436,9 @@ async def _prompt_current_state(update: Update, user: User):
         OnboardingState.collecting_name: ("What's your full name?", None),
         OnboardingState.collecting_age: ("How old are you?", None),
         OnboardingState.collecting_gender: ("What's your gender?", gender_keyboard()),
-        OnboardingState.collecting_height: ("What's your height in cm?", None),
-        OnboardingState.collecting_weight: ("What's your current weight in kg?", None),
-        OnboardingState.collecting_goal_weight: ("What's your goal weight in kg?", None),
+        OnboardingState.collecting_height: ("What's your height? (e.g., 175cm or 5'10\")", None),
+        OnboardingState.collecting_weight: ("What's your current weight? (e.g., 85kg or 187 lbs)", None),
+        OnboardingState.collecting_goal_weight: ("What's your goal weight? (e.g., 75kg or 165 lbs)", None),
         OnboardingState.collecting_timeline: ("How many months for your goal?", None),
         OnboardingState.collecting_diet: ("What's your diet preference?", diet_keyboard()),
         OnboardingState.collecting_workout_level: ("What's your workout level?", workout_level_keyboard()),
