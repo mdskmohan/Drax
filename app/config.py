@@ -1,4 +1,5 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import field_validator
 from functools import lru_cache
 
 
@@ -41,6 +42,13 @@ class Settings(BaseSettings):
     # Defaults
     default_daily_water_ml: int = 3000
     default_calorie_deficit: int = 500
+
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def fix_async_url(cls, v: str) -> str:
+        if v.startswith("postgresql://"):
+            return v.replace("postgresql://", "postgresql+asyncpg://", 1)
+        return v
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
