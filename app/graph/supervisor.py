@@ -18,7 +18,6 @@ Classify the user message into exactly one of these intents:
 - get_motivation → user wants motivation, a quote, or pump-up message
 - get_plan      → user wants their full daily plan (meals + workout together)
 - report_pain   → user reports pain, injury, soreness, or discomfort
-- scan_equipment → user wants to update or scan their gym equipment
 - general       → anything else (greetings, questions, help)
 
 Return JSON: {"intent": "<intent>", "confidence": 0.0-1.0}"""
@@ -52,7 +51,7 @@ async def supervisor_node(state: DraxState) -> dict:
 
     # Validate intent is one of the known values
     valid = {"log_meal","log_water","get_workout","log_weight","get_progress",
-             "get_motivation","get_plan","report_pain","scan_equipment","general"}
+             "get_motivation","get_plan","report_pain","general"}
     if intent not in valid:
         intent = "general"
 

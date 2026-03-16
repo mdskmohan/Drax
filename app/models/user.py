@@ -4,6 +4,39 @@ import enum
 from app.database import Base
 
 
+# ── Default notification preferences ──────────────────────────────────────────
+# All times are in the user's configured timezone (user.timezone).
+# Tasks run every 30 minutes and send if the user's time falls in that window.
+DEFAULT_NOTIFICATION_PREFS = {
+    "morning_plan": {
+        "enabled": True,
+        "time": "05:00",   # HH:MM
+        "days": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
+    },
+    "preworkout": {
+        "enabled": True,
+        "time": "06:00",
+        "days": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
+    },
+    "evening_checkin": {
+        "enabled": True,
+        "time": "21:00",
+        "days": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
+    },
+    "water_reminder": {
+        "enabled": True,
+        "start_hour": 8,       # Don't send before this hour (local)
+        "end_hour": 20,        # Don't send after this hour (local)
+        "interval_hours": 2,   # Send every N hours
+    },
+    "weekly_report": {
+        "enabled": True,
+        "time": "08:00",
+        "day": "Sunday",
+    },
+}
+
+
 class DietPreference(str, enum.Enum):
     omnivore = "omnivore"
     vegetarian = "vegetarian"
@@ -76,6 +109,14 @@ class User(Base):
     # Apple Health / Google Health Connect sync
     health_sync_token = Column(String(64), nullable=True, unique=True)
 
+    # Per-user notification schedule preferences
+    # Structure mirrors DEFAULT_NOTIFICATION_PREFS — only overrides need to be stored
+    notification_prefs = Column(JSON, nullable=True)
+
+    # ISO datetime strings of when each notification was last sent, keyed by type
+    # e.g. {"morning_plan": "2026-03-16T05:02:00+05:30", "water_reminder": "..."}
+    notifications_last_sent = Column(JSON, nullable=True)
+
     # State
     onboarding_state = Column(
         SAEnum(OnboardingState), default=OnboardingState.not_started
@@ -116,9 +157,35 @@ class User(Base):
             return self.current_weight_kg - self.goal_weight_kg
         return None
 
+    def get_notification_pref(self, notif_type: str) -> dict:
+        """Return effective notification prefs for a type, merged with defaults."""
+        defaults = DEFAULT_NOTIFICATION_PREFS.get(notif_type, {})
+        overrides = (self.notification_prefs or {}).get(notif_type, {})
+        return {**defaults, **overrides}
+
+    def set_notification_pref(self, notif_type: str, updates: dict):
+        """Merge updates into notification_prefs for a specific type."""
+        prefs = dict(self.notification_prefs or {})
+        existing = dict(prefs.get(notif_type, {}))
+        existing.update(updates)
+        prefs[notif_type] = existing
+        self.notification_prefs = prefs
+
+    @property
+    def safe_calorie_floor(self) -> int:
+        """
+        Minimum daily calorie intake per Academy of Nutrition and Dietetics (AND) guidelines.
+        Below this, weight loss requires clinical supervision.
+        """
+        return 1500 if self.gender == "male" else 1200
+
     def calculate_macros(self):
-        """Calculate and set macro targets based on calorie goal (high-protein for fat loss)."""
+        """
+        Calculate and set macro targets based on calorie goal.
+        High-protein split for fat loss (35% protein / 35% carbs / 30% fat).
+        Aligned with ACSM protein recommendations for active individuals (1.2–2.0 g/kg).
+        """
         cal = self.daily_calorie_target or 1800
-        self.protein_target_g = round(cal * 0.35 / 4)   # 35% protein
-        self.fat_target_g = round(cal * 0.30 / 9)        # 30% fat
-        self.carbs_target_g = round(cal * 0.35 / 4)      # 35% carbs
+        self.protein_target_g = round(cal * 0.35 / 4)   # 35% calories from protein
+        self.fat_target_g = round(cal * 0.30 / 9)        # 30% calories from fat
+        self.carbs_target_g = round(cal * 0.35 / 4)      # 35% calories from carbohydrates

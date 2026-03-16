@@ -16,37 +16,39 @@ celery_app.conf.update(
     task_serializer="json",
     accept_content=["json"],
     result_serializer="json",
-    timezone="Asia/Kolkata",
+    timezone="UTC",    # Always UTC internally; per-user local times handled in tasks
     enable_utc=True,
     task_track_started=True,
     task_acks_late=True,
 )
 
 # ── Periodic task schedule ─────────────────────────────────────────────────────
+# All tasks run every 30 minutes and check each user's configured time/day
+# in their own timezone before sending. This supports any timezone worldwide.
 celery_app.conf.beat_schedule = {
-    # Morning plan — 5:00 AM IST every day (gym at 6:30-7 AM)
+    # Runs every 30 min — sends to users whose morning_plan time is in this window
     "morning-plan": {
         "task": "app.tasks.scheduled.send_morning_plan",
-        "schedule": crontab(hour=23, minute=30),  # 5:00 AM IST = 23:30 UTC (prev day)
+        "schedule": crontab(minute="0,30"),
     },
-    # Pre-gym reminder — 6:00 AM IST (30 min before gym)
+    # Runs every 30 min — sends to users whose preworkout time is in this window
     "pre-gym-motivation": {
         "task": "app.tasks.scheduled.send_pre_workout_motivation",
-        "schedule": crontab(hour=0, minute=30),  # 6:00 AM IST = 00:30 UTC
+        "schedule": crontab(minute="0,30"),
     },
-    # Evening check-in — 9:00 PM IST
+    # Runs every 30 min — sends to users whose evening_checkin time is in this window
     "evening-checkin": {
         "task": "app.tasks.scheduled.send_evening_checkin",
-        "schedule": crontab(hour=15, minute=30),  # 9:00 PM IST = 15:30 UTC
+        "schedule": crontab(minute="0,30"),
     },
-    # Water reminder — Every 2 hours between 8 AM – 8 PM IST
+    # Runs every 30 min — sends to users due for a water reminder based on their interval
     "water-reminder": {
         "task": "app.tasks.scheduled.send_water_reminder",
-        "schedule": crontab(hour="2,4,6,8,10,12", minute=30),
+        "schedule": crontab(minute="0,30"),
     },
-    # Weekly report — Sunday 8:00 AM IST
+    # Runs every 30 min — sends to users whose weekly_report day+time is now
     "weekly-report": {
         "task": "app.tasks.scheduled.send_weekly_report",
-        "schedule": crontab(day_of_week=0, hour=2, minute=30),
+        "schedule": crontab(minute="0,30"),
     },
 }

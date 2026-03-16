@@ -58,6 +58,11 @@ from app.bot.handlers.equipment import (
     equipment_photo_handler,
 )
 from app.bot.handlers.health_sync import sync_command, sync_callback
+from app.bot.handlers.notifications import (
+    notifications_command,
+    handle_notification_callback,
+    process_notif_time_input,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -82,6 +87,8 @@ async def route_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 return
 
     # State-based routing
+    if await process_notif_time_input(update, context):
+        return
     if await process_weight_log(update, context):
         return
     if await process_water_text(update, context):
@@ -102,13 +109,22 @@ async def route_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     data = query.data
 
-    # Onboarding callbacks
-    if data.startswith(("gender_", "diet_", "level_", "gym_", "schedule_", "lang_")) or \
-       (data.startswith(("equip_", "equip_setup_", "equip_toggle_", "equip_done")) and
-        context.user_data.get("equipment_onboarding")):
+    # Notification settings callbacks
+    if data.startswith("notif_"):
+        handled = await handle_notification_callback(update, context)
+        if handled:
+            return
+
+    # Onboarding callbacks — try for standard onboarding prefixes AND all equip_ prefixes
+    if data.startswith(("gender_", "diet_", "level_", "gym_", "schedule_", "lang_", "equip_")):
         handled = await handle_onboarding_callback(update, context)
         if handled:
             return
+
+    # Settings → notification menu
+    if data == "settings":
+        await notifications_command(update, context)
+        return
 
     # Main menu
     if data == "log_meal":
@@ -176,6 +192,7 @@ def build_application() -> Application:
     app.add_handler(CommandHandler("motivation", motivation_command))
     app.add_handler(CommandHandler("equipment", equipment_command))
     app.add_handler(CommandHandler("sync", sync_command))
+    app.add_handler(CommandHandler("notifications", notifications_command))
 
     # Photos — equipment detection first, then food photo fallback
     async def route_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):

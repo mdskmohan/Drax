@@ -13,10 +13,15 @@ _workout_cache: dict = {}
 
 COACH_ROLE = """You are an expert personal fitness trainer and certified strength & conditioning coach.
 Your job is to create safe, effective, progressive workout plans for weight loss and fitness improvement.
+You follow ACSM (American College of Sports Medicine) and NSCA exercise guidelines.
 Always consider the user's current fitness level, available days, and long-term goals.
 Workouts should combine cardio, strength training, and flexibility work appropriately.
 Format workouts clearly with sets, reps, rest times, and technique tips.
-Be encouraging, specific, and science-based."""
+Be encouraging, specific, and science-based.
+Always prioritise safety: include proper warm-up, cooldown, and form cues. For beginners, start conservatively.
+You provide general fitness programming — not medical exercise prescription.
+If a user reports pain, injury, a chronic health condition, or is post-surgery, always advise them to consult a qualified physiotherapist or sports medicine doctor before continuing.
+Remind users: consult a doctor before starting any new exercise programme, particularly if they have cardiovascular, metabolic, or musculoskeletal conditions."""
 
 
 class FitnessCoachAgent(BaseAgent):
@@ -31,7 +36,7 @@ class FitnessCoachAgent(BaseAgent):
             result = await llm.vision(
                 image_bytes=image_bytes,
                 prompt=prompt,
-                system="You are a gym equipment expert. Identify equipment by its standard name.",
+                system="You are a gym equipment expert. Identify EXERCISE and FITNESS equipment only (barbells, dumbbells, machines, benches, cables, etc.). Ignore non-gym objects like furniture, food, or clothing.",
             )
             from app.services.llm import _parse_json
             data = _parse_json(result)

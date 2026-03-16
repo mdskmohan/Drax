@@ -2,37 +2,68 @@
 
 > Your personal trainer, nutritionist, and accountability coach — all inside Telegram.
 
-Drax is a fully open-source AI fitness bot that tracks your meals, generates personalized workouts, logs your water intake, and delivers a complete daily plan every morning at 5 AM. It adapts to your progress, handles injuries, and keeps you accountable — all through a simple Telegram chat.
+Drax is a fully open-source AI fitness bot that tracks your meals, generates personalised workouts, logs your water intake, and delivers a complete daily plan every morning. It adapts to your progress, handles injuries, and keeps you accountable — all through a simple Telegram chat.
 
 ---
 
-## What Drax does for you every day
+## Health Advisory
+
+> **Drax provides general fitness and nutrition guidance only — not medical advice.**
+
+Drax calculates your targets using internationally validated methods (Mifflin-St Jeor BMR formula, ACSM activity multipliers, WHO/AND calorie guidelines). These are appropriate starting points for healthy adults with general weight-loss goals.
+
+**Consult a professional before using Drax if you:**
+- Have a chronic health condition (diabetes, heart disease, hypertension, kidney disease, etc.)
+- Are pregnant or breastfeeding
+- Take medication that affects weight, metabolism, or exercise capacity
+- Are recovering from surgery or injury
+- Have a history of eating disorders
+- Are under 18 years of age (parental guidance and paediatric medical advice recommended)
+
+**Where to get professional support:**
+- **Registered Dietitian (RD/RDN)** — clinical nutrition plans, eating disorders, medical conditions
+- **Certified Personal Trainer (CPT / CSCS)** — safe, individualised exercise programming
+- **Physiotherapist / Sports Medicine Doctor** — injury management and return-to-sport
+- **GP / Doctor** — before starting any significant diet or exercise programme
+
+---
+
+## What Drax does every day
+
+Drax works in the background and messages you automatically at times you choose:
 
 ```
-5:00 AM  → Morning motivation + full workout plan sent to your Telegram
-6:00 AM  → Pre-gym pump-up message (30 min before you leave)
-Every 2h → Water reminders if you're falling behind
-9:00 PM  → Evening check-in — did you eat well? did you work out? how's your water?
-Sunday   → Full weekly progress report with trend analysis
+Your morning time  → Motivation + full workout plan + daily meal suggestions
+Your preworkout time → Pump-up message before you head to the gym
+Every N hours      → Water reminders when you're falling behind (configurable)
+Your evening time  → Check-in: calories, water, workout summary
+Your chosen day    → Full weekly progress report with trend analysis
 ```
 
-You just show up — Drax handles the coaching.
+All times and days are **fully configurable per-user** via `/notifications`. You set your schedule — Drax respects it.
 
 ---
 
 ## Features
 
-| Feature | How to use it |
+| Feature | How to use |
 |---|---|
-| 🍽️ **Meal Tracking** | Just type what you ate — `"had chicken rice and salad"` |
-| 💧 **Hydration** | Log water with `"drank 500ml"` or `/water` |
-| 🏋️ **Workout Plans** | `/workout` — personalized plan with YouTube tutorials |
-| 📋 **Daily Plan** | `/plan` — full meal + workout plan for the day |
-| ⚖️ **Weight Logging** | `/weight` — type your weight, get AI feedback + progress bar |
-| 📊 **Progress** | `/progress` — dashboard with weight journey, calories, water, workouts |
-| 📈 **Weekly Report** | `/report` — detailed AI analysis every Sunday |
-| 💪 **Motivation** | `/motivation` — when you need a push |
-| 🤕 **Injury Support** | Tell Drax what hurts — it modifies your workout around it |
+| 🍽️ **Meal Tracking** | Type what you ate: `"had chicken rice and salad"` |
+| 📷 **Food Photo AI** | Send a photo of your meal — AI detects food and estimates macros |
+| 💧 **Hydration Tracking** | `"drank 500ml"` or tap `/water` → quick log buttons |
+| 🏋️ **Personalised Workouts** | `/workout` — plan adapts to your equipment, level, and schedule |
+| 🏠 **Equipment-Aware Plans** | `/equipment` — tell Drax what you have or send a gym photo |
+| 📋 **Daily Plan** | `/plan` — full meal + workout plan in one message |
+| ⚖️ **Weight Logging** | `/weight` — AI feedback + progress bar every time you log |
+| 📊 **Progress Dashboard** | `/progress` — weight journey, calories, water, workout streak |
+| 🎯 **Macro Tracking** | Every meal logs calories, protein, carbs, and fat |
+| 📈 **Weekly Report** | `/report` — deep AI analysis of your week |
+| 💪 **Motivation** | `/motivation` — personalised message when you need a push |
+| 🤕 **Injury Support** | Tell Drax what hurts — workout gets modified around the injury |
+| 📅 **Custom Gym Schedule** | Pick exact training days — Drax auto-detects rest days |
+| 🔔 **Configurable Notifications** | `/notifications` — set your own time + days for everything |
+| 🔄 **Health Sync** | `/sync` — connect Apple Health or Google Fit |
+| 🌍 **Multi-language** | English, Hindi, Spanish, French, Arabic, German |
 
 ---
 
@@ -47,82 +78,161 @@ cd Drax
 
 ### Step 2 — Get your API keys
 
-You need **at minimum** a Telegram Bot Token + one LLM API key. Everything else is optional.
+You need **at minimum** a Telegram Bot Token + one LLM key. Everything else is optional.
 
-#### Required: Telegram Bot Token
-1. Open Telegram and search for **@BotFather**
+#### Telegram Bot Token (required)
+1. Open Telegram → search **@BotFather**
 2. Send `/newbot`
-3. Choose a name (e.g., "My Fitness Coach") and a username (e.g., `myfitnesscoach_bot`)
-4. BotFather will send you a token like `8335466070:AAHHJi4ELa8odxBP99zL6HyQ...` — copy it
+3. Choose a name (e.g., `My Fitness Coach`) and a username (e.g., `mycoach_bot`)
+4. BotFather replies with a token like `8335466070:AAHHJi4EL...` — copy it
 
-#### Required: One LLM API Key (pick one)
+#### LLM API Key (required — pick one)
 
-| Provider | Cost | Where to get it | Best for |
+| Provider | Monthly cost (personal use) | Where to get | Best for |
 |---|---|---|---|
-| **Claude (Anthropic)** | ~$0.25/1M tokens (Haiku) | [console.anthropic.com](https://console.anthropic.com) → API Keys | Best quality, recommended |
-| **DeepSeek** | ~$0.07/1M tokens | [platform.deepseek.com](https://platform.deepseek.com) → API Keys | Cheapest option |
-| **OpenAI** | ~$0.15/1M tokens (4o-mini) | [platform.openai.com](https://platform.openai.com) → API keys | Widely available |
+| **Claude (Anthropic)** | ~$1–5/month | [console.anthropic.com](https://console.anthropic.com) → API Keys | Best coaching quality |
+| **DeepSeek** | ~$0.20–1/month | [platform.deepseek.com](https://platform.deepseek.com) → API Keys | Cheapest |
+| **OpenAI** | ~$1–3/month | [platform.openai.com](https://platform.openai.com) → API keys | Widely known |
 
-> **Recommendation:** Start with **DeepSeek** if you want the cheapest option, or **Claude** for the best coaching quality.
+> **Recommendation:** Start with **DeepSeek** (cheapest, great quality) or **Claude** (best responses).
 
-#### Optional: Nutritionix (accurate calorie/macro data)
-- Free tier: 500 requests/day
-- Sign up at [developer.nutritionix.com](https://developer.nutritionix.com)
-- Without this, Drax estimates nutrition using the LLM — still works, just less precise
+#### Optional add-ons
 
-#### Optional: YouTube API (exercise tutorial videos)
-- Free tier: 10,000 requests/day (plenty)
-- Go to [Google Cloud Console](https://console.cloud.google.com) → Create project → Enable "YouTube Data API v3" → Credentials → API Key
-- Without this, Drax generates workouts without video links
+| Service | Why | Free tier | Where |
+|---|---|---|---|
+| Nutritionix | Accurate calorie + macro data | 500 calls/day | [developer.nutritionix.com](https://developer.nutritionix.com) |
+| YouTube API | Exercise tutorial videos in workouts | 10,000 units/day | [Google Cloud Console](https://console.cloud.google.com) → YouTube Data API v3 |
 
-### Step 3 — Configure your environment
+> Without these, Drax still works — it estimates nutrition via LLM and generates workouts without video links.
+
+### Step 3 — Configure environment
 
 ```bash
 cp .env.example .env
 ```
 
-Open `.env` and fill in your keys — it takes 2 minutes:
+Open `.env` and fill in the 3 required values:
 
 ```env
-TELEGRAM_BOT_TOKEN=paste_your_token_here
+TELEGRAM_BOT_TOKEN=paste_your_bot_token_here
 
-LLM_PROVIDER=claude                    # or: openai, deepseek
-ANTHROPIC_API_KEY=paste_your_key_here  # only needed if LLM_PROVIDER=claude
-# OPENAI_API_KEY=                      # only needed if LLM_PROVIDER=openai
-# DEEPSEEK_API_KEY=                    # only needed if LLM_PROVIDER=deepseek
+LLM_PROVIDER=claude                     # or: openai, deepseek
+ANTHROPIC_API_KEY=paste_your_key_here   # only if LLM_PROVIDER=claude
+# OPENAI_API_KEY=                       # only if LLM_PROVIDER=openai
+# DEEPSEEK_API_KEY=                     # only if LLM_PROVIDER=deepseek
 ```
 
-### Step 4 — Run locally
+Everything else in `.env` has working defaults for local use.
 
-The easiest way is Docker (handles PostgreSQL and Redis automatically):
+### Step 4 — Start the bot
+
+**With Docker (recommended — one command):**
 
 ```bash
 docker compose up
 ```
 
-That's it. The bot starts in polling mode automatically.
+This starts the bot, PostgreSQL, Redis, and Celery worker automatically.
 
-Or without Docker:
+**Without Docker:**
 
 ```bash
-# Start database
+# Start only the database and redis
 docker compose up db redis -d
 
-# Install Python deps
+# Set up Python environment
 python -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
 
-# Run
+# Run database migrations
+alembic upgrade head
+
+# Start the bot
 python run_polling.py
 ```
 
-### Step 5 — Start the bot on Telegram
+### Step 5 — Open Telegram and send /start
 
-1. Open Telegram
-2. Search for your bot by username (the one you set in BotFather)
-3. Send `/start`
-4. Complete the onboarding (takes ~2 minutes — sets your weight, goal, gym schedule, diet preferences)
-5. You're live
+1. Search for your bot by the username you chose in BotFather
+2. Tap **Start** or send `/start`
+3. Drax shows a health disclaimer and begins onboarding (about 2 minutes)
+4. You're live — your first morning plan arrives at your configured time
+
+---
+
+## Onboarding Walkthrough
+
+When a new user sends `/start`, Drax walks through a short setup to personalise everything. Here is every step:
+
+```
+/start
+ │
+ ├─ 1. Health disclaimer displayed
+ │
+ ├─ 2. Full name
+ │       "What's your full name?"
+ │
+ ├─ 3. Age
+ │       "How old are you?"
+ │       (Under-18 advisory shown if applicable)
+ │
+ ├─ 4. Gender  [Male] [Female]
+ │       Used for Mifflin-St Jeor BMR formula
+ │
+ ├─ 5. Height in cm
+ │       "What's your height in cm? (e.g., 175)"
+ │
+ ├─ 6. Current weight in kg
+ │       "What's your current weight? (e.g., 95.5)"
+ │
+ ├─ 7. Goal weight in kg
+ │       "What's your goal weight? (e.g., 75)"
+ │
+ ├─ 8. Timeline
+ │       "In how many months? (e.g., 10)"
+ │       → Warning shown if goal implies > 1.0 kg/week loss (unsafe)
+ │       → Realistic timeline suggestion provided
+ │
+ ├─ 9. Diet preference
+ │       [Omnivore] [Vegetarian] [Vegan] [Keto] [Paleo]
+ │
+ ├─ 10. Workout level
+ │        [Beginner 0–1yr] [Intermediate 1–3yr] [Advanced 3+yr]
+ │        Used for TDEE activity multiplier
+ │
+ ├─ 11. Gym days per week
+ │        [2] [3] [4] [5] [6]
+ │
+ ├─ 12. Training schedule (multi-select)
+ │        [Mon] [Tue] [Wed] [Thu] [Fri] [Sat] [Sun] → Done
+ │        Exact days used for gym-day detection and rest-day planning
+ │
+ ├─ 13. Equipment setup
+ │        [Full Gym] [Home Gym] [Bodyweight Only] [Send Photo]
+ │        → If Full Gym or Home: toggle individual items (barbell, dumbbells, etc.)
+ │        → If Photo: vision AI scans and detects equipment automatically
+ │
+ ├─ 14. Language
+ │        [English] [Hindi] [Spanish] [French] [Arabic] [German]
+ │
+ └─ Setup Complete! Summary shown:
+         ✅ Calorie target (TDEE − 500 kcal, min 1200/1500 floor)
+         ✅ Macro targets (protein / carbs / fat in grams)
+         ✅ Daily water target (35 ml/kg + workout bonus)
+         ✅ Training schedule
+         ✅ Equipment list
+         ✅ Language preference
+         ✅ Professional consultation advisory
+```
+
+**What gets calculated automatically:**
+- **BMR** — Mifflin-St Jeor (1990): most accurate validated formula
+- **TDEE** — BMR × activity factor (1.375 beginner / 1.55 intermediate / 1.725 advanced)
+- **Calorie target** — TDEE − 500 kcal (safe ~0.45 kg/week loss), minimum 1200 kcal women / 1500 kcal men
+- **Macros** — 35% protein / 35% carbs / 30% fat of daily calories
+- **Water target** — 35 ml/kg body weight + 500 ml on workout days (2000–5000 ml range)
+
+The bot is fully ready the moment onboarding completes. No further setup needed.
 
 ---
 
@@ -130,95 +240,107 @@ python run_polling.py
 
 | Command | What it does |
 |---|---|
-| `/start` | First-time setup / return to main menu |
-| `/menu` | Show the main menu buttons |
-| `/plan` | Get today's full meal + workout plan |
-| `/workout` | Generate today's workout with YouTube links |
-| `/meal` | Log a meal (select type → describe food) |
-| `/water` | Log water intake (quick buttons or type amount) |
-| `/weight` | Log your current weight |
-| `/progress` | View your full progress dashboard |
-| `/report` | Generate a detailed weekly progress report |
-| `/motivation` | Get a personalized motivational message |
+| `/start` | First-time setup, or return to main menu if already set up |
+| `/menu` | Show the main menu with all action buttons |
+| `/plan` | Get today's full meal plan + workout in one message |
+| `/workout` | Generate today's workout plan with YouTube tutorial links |
+| `/meal` | Log a meal — select type, then describe food or send a photo |
+| `/water` | Log water — tap quick amounts or type `"drank 750ml"` |
+| `/weight` | Log your current weight, get AI trend feedback |
+| `/progress` | View full progress dashboard (weight, calories, water, workouts) |
+| `/report` | Generate a detailed AI weekly progress report on demand |
+| `/motivation` | Get a personalised motivational message |
+| `/equipment` | Update your gym equipment (select, toggle, or scan a photo) |
+| `/notifications` | Configure when and which days you receive each notification |
+| `/sync` | Connect Apple Health or Google Fit via webhook |
 | `/help` | Show all commands |
 
-### Free-text logging (just type naturally)
+### Just type naturally
 
-You don't have to use commands for everything. Just type:
+You don't need to use commands for daily tracking. Just message the bot:
 
-- `"had 2 eggs and toast for breakfast"` → logs as breakfast
-- `"drank 1L of water"` → logs water intake
-- `"I weigh 87.5kg"` → logs weight
-- `"I feel a sharp pain in my knee"` → Drax assesses and modifies your workout
-- `"motivate me"` → get a motivation message
-- Anything else → Drax's AI figures out what you need
+| What you type | What happens |
+|---|---|
+| `"had 2 eggs, toast, and OJ for breakfast"` | Logs as breakfast with full macro breakdown |
+| `"chicken biryani for lunch, medium portion"` | Logs as lunch — understands Indian and regional foods |
+| `"drank 1L of water"` | Logs 1000ml hydration |
+| `"2 glasses of water"` | Logs 500ml hydration |
+| `"I weigh 87.5 kg"` | Logs weight, shows progress bar and AI feedback |
+| `"sharp pain in my left knee"` | AI assesses, modifies workout to avoid the affected area |
+| `"motivate me"` or `"I need a push"` | Personalised motivational message |
+| `"what's my plan for today?"` | Full daily plan |
+| Anything else | Drax's AI figures out your intent |
+
+You can also **send a photo of your food** — Drax uses vision AI to identify the items and estimate nutrition automatically.
+
+---
+
+## Notification Schedule
+
+Drax sends you automatic messages throughout the day. Every notification is fully configurable:
+
+| Notification | Default | What you can change |
+|---|---|---|
+| 🌅 Morning Plan | 05:00, every day | Time + which days |
+| ⚡ Pre-Workout | 06:00, every day | Time + which days |
+| 🌙 Evening Check-in | 21:00, every day | Time + which days |
+| 💧 Water Reminders | 08:00–20:00, every 2h | Active hours + interval (1h/2h/3h/4h) |
+| 📊 Weekly Report | Sunday 08:00 | Time + which day of the week |
+
+**To configure:** Send `/notifications` or tap **Settings** in the main menu.
+
+All times are in **your local timezone** (set via `user.timezone`, default: `Asia/Kolkata`). Drax handles every timezone worldwide.
 
 ---
 
 ## How much does it cost to run?
 
-Running Drax for personal use costs almost nothing:
+For personal use, the API costs are minimal:
 
-| What | Cost estimate |
-|---|---|
-| Claude Haiku (most calls) | ~$0.001–0.003 per day of active use |
-| Claude Sonnet (workout/report gen) | ~$0.01–0.05 per workout plan |
-| Nutritionix free tier | $0 (500 requests/day) |
-| YouTube free tier | $0 (10,000 units/day) |
-| **Total per month (personal use)** | **~$1–5/month in API costs** |
+| LLM call type | Frequency | Estimated cost |
+|---|---|---|
+| Meal parsing (fast model) | Every meal logged | ~$0.0001 per meal |
+| Workout generation (main model, cached 24h) | Once per day | ~$0.005–0.02 |
+| Weekly report (main model) | Once per week | ~$0.01–0.05 |
+| Intent classification (fast/rule-based) | Every message | ~$0.00001 |
+| Motivation / weight feedback (fast) | On demand | ~$0.0001 |
+| **Total — 1 active user/month** | | **~$1–5/month** |
+| **Total — 10 active users/month** | | **~$5–20/month** |
 
-Hosting on Railway free tier = $0 extra until you exceed $5/month credit.
+Nutritionix and YouTube are free at typical usage levels. Hosting on Railway free tier costs $0 until you exceed $5/month credit.
 
 ---
 
-## Deploy to Production (always-on bot)
+## Deploy to Production
 
-For 24/7 operation, you need to host it. The easiest option is **Railway**.
+### Railway — Recommended (15 min, free to start)
 
-### Railway — Recommended (15 min setup, free to start)
+Railway handles Docker, PostgreSQL, Redis, and SSL automatically.
 
-Railway automatically handles Docker, PostgreSQL, Redis, and SSL.
-
-1. Push your code to GitHub (already done if you forked)
-
-2. Go to [railway.app](https://railway.app) → sign up with GitHub
-
-3. Click **New Project** → **Deploy from GitHub repo** → select your Drax repo
-
-4. Add PostgreSQL:
-   - Click `+ New` → Database → **Add PostgreSQL**
-   - Railway sets `DATABASE_URL` automatically
-
-5. Add Redis:
-   - Click `+ New` → Database → **Add Redis**
-   - Railway sets `REDIS_URL` automatically
-
-6. Set environment variables (Railway dashboard → your service → Variables):
+1. Push your code to GitHub
+2. Go to [railway.app](https://railway.app) → **New Project** → **Deploy from GitHub repo**
+3. Select your Drax repo
+4. Click `+ New` → **Add PostgreSQL** (Railway sets `DATABASE_URL` automatically)
+5. Click `+ New` → **Add Redis** (Railway sets `REDIS_URL` automatically)
+6. Go to your service → **Variables** → add:
    ```
    TELEGRAM_BOT_TOKEN=your_token
    LLM_PROVIDER=claude
    ANTHROPIC_API_KEY=your_key
    TELEGRAM_WEBHOOK_URL=https://your-app-name.railway.app
-   SECRET_KEY=any_random_string_here
+   SECRET_KEY=any_long_random_string
    ```
+7. Railway builds and deploys. Your bot is live.
+8. Add Celery worker: `+ New Service` → same repo → start command:
+   `celery -A app.tasks.celery_app worker --loglevel=info`
+9. Add Celery beat (scheduler): `+ New Service` → same repo → start command:
+   `celery -A app.tasks.celery_app beat --loglevel=info`
 
-7. Railway builds and deploys automatically. Your bot is live.
+Every `git push` to main auto-deploys all three services.
 
-8. Add Celery worker (for scheduled messages):
-   - `+ New Service` → GitHub repo (same repo)
-   - Set start command: `celery -A app.tasks.celery_app worker --loglevel=info`
+### VPS (Hetzner / DigitalOcean) — $3–5/month, full control
 
-9. Add Celery beat (scheduler):
-   - `+ New Service` → GitHub repo (same repo)
-   - Set start command: `celery -A app.tasks.celery_app beat --loglevel=info`
-
-> Every `git push` to main now auto-deploys. Zero maintenance.
-
-### VPS — Best value ($3–5/month, full control)
-
-Best if you want full control or are running it for multiple users.
-
-See [DEPLOY.md](DEPLOY.md) for step-by-step guides for Railway, VPS (Hetzner), Render, and Fly.io.
+See [DEPLOY.md](DEPLOY.md) for complete step-by-step guides for Railway, Hetzner VPS, Render, and Fly.io.
 
 ---
 
@@ -229,45 +351,60 @@ Telegram Message
       │
       ▼
 Bot Router (python-telegram-bot)
+  ├── Command handlers (/workout, /meal, /water, etc.)
+  ├── Photo handler (equipment detection → food photo fallback)
+  ├── Callback router (all inline button presses)
+  └── Text router (state-based → LangGraph)
       │
       ▼
-LangGraph Supervisor
-  (classifies intent: meal/water/workout/progress/etc.)
-      │
-      ▼
-Agent Node (does the work)
-  ├── log_meal   → NutritionAgent → parse + save + feedback
-  ├── log_water  → HydrationAgent → parse + save + status
-  ├── get_workout → FitnessCoachAgent → generate plan (cached daily)
-  ├── log_weight → ProgressAgent → save + feedback
-  ├── get_progress → DB queries → dashboard
-  ├── get_plan   → meal plan + workout (parallel)
+LangGraph (supervisor + agent nodes)
+  ├── Supervisor  → classifies intent (rule-based shortcuts + fast LLM)
+  ├── log_meal    → NutritionAgent → parse + Nutritionix → save + feedback
+  ├── log_water   → HydrationAgent → parse + save + hydration status
+  ├── get_workout → FitnessCoachAgent → generate (cached 24h) + YouTube links
+  ├── log_weight  → ProgressAgent → save + trend analysis + progress bar
+  ├── get_progress → DB aggregation → dashboard
+  ├── get_plan    → meal plan + workout (combined)
   ├── get_motivation → MotivationAgent → fast LLM
-  ├── report_pain → RecoveryAgent → assess + modify workout
-  └── general    → fast LLM fallback
+  ├── report_pain → RecoveryAgent → AI assessment + modified workout
+  ├── general     → fast LLM conversational fallback
+  └── chain_check → auto-nudge for water after meal logging
       │
       ▼
-Celery + Redis (scheduled tasks)
-      │
-PostgreSQL (all data stored)
+PostgreSQL (all user data + logs)
+
+Celery + Redis (scheduled notifications)
+  └── Runs every 30 min → checks each user's configured time in their timezone
 ```
 
-### LLM Usage — What actually needs AI
+### What actually calls the LLM (cost transparency)
 
-Not everything calls the LLM. Here's what does and doesn't:
+| Task | LLM? | Model | Notes |
+|---|---|---|---|
+| Meal text parsing | ✅ | Fast (Haiku/mini) | Understands natural language food |
+| Meal feedback | ✅ | Fast | 2–3 sentence response |
+| Workout generation | ✅ | Main (Sonnet/4o) | Cached daily — only once per day |
+| Weekly report | ✅ | Main | Deep analysis |
+| Pain assessment | ✅ | Main | Safety-critical |
+| Weight feedback | ✅ | Fast | Short personalised response |
+| Morning motivation | ✅ | Fast | Quick pump-up |
+| Intent classification | ✅ | Fast | Only for ambiguous inputs |
+| Hydration tips/status | ❌ | None | Rule-based math + templates |
+| Rest day message | ❌ | None | 4 pre-written rotations |
+| Progress bar | ❌ | None | Pure calculation |
+| Water amount parsing | ❌ | None | Regex: "500ml", "2 glasses" → ml |
 
-| Task | Uses LLM? | Why |
+### Standards & Methodology
+
+| Calculation | Method | Reference |
 |---|---|---|
-| Parse meal text | ✅ Fast model (Haiku/mini) | Needs to understand food descriptions |
-| Generate workout plan | ✅ Main model (cached 24h) | Complex personalized planning |
-| Weekly progress report | ✅ Main model | Deep analysis needed |
-| Pain assessment | ✅ Main model | Safety-critical, needs reasoning |
-| Weight/motivation feedback | ✅ Fast model | Short personal responses |
-| Hydration status/tips | ❌ Rule-based | Just math + templates |
-| Rest day message | ❌ Templates | Pre-written, rotated randomly |
-| Progress bar | ❌ Math | Pure computation |
-| Water amount parsing | ❌ Regex | "500ml", "2 glasses" → numbers |
-| Intent classification | ✅ Fast (or rule-based) | Supervisor node + shortcuts |
+| BMR | Mifflin-St Jeor (1990) | Most accurate validated formula; ACSM-recommended |
+| TDEE | BMR × 1.375 / 1.55 / 1.725 | Standard activity multipliers |
+| Calorie deficit | 500 kcal/day | AND/WHO: safe for ~0.45 kg/week loss |
+| Calorie floor | 1200 kcal (women), 1500 kcal (men) | Academy of Nutrition and Dietetics |
+| Macros | 35% protein / 35% carbs / 30% fat | ACSM high-protein fat-loss split |
+| Hydration | 35 ml/kg + 500 ml workout bonus | EFSA adequate intake; ACSM guidelines |
+| Safe loss rate | 0.25–1.0 kg/week | WHO / Academy of Nutrition and Dietetics |
 
 ---
 
@@ -276,39 +413,59 @@ Not everything calls the LLM. Here's what does and doesn't:
 ```
 drax/
 ├── app/
-│   ├── agents/          # 6 specialized agents (fitness, nutrition, hydration, motivation, progress, recovery)
-│   ├── graph/           # LangGraph: state, supervisor, nodes, graph assembly
+│   ├── agents/              # AI coaching agents
+│   │   ├── base_agent.py    # Shared: user context, language support
+│   │   ├── nutrition_agent.py
+│   │   ├── fitness_coach.py
+│   │   ├── hydration_agent.py
+│   │   ├── motivation_agent.py
+│   │   ├── progress_agent.py
+│   │   └── recovery_agent.py
+│   ├── graph/               # LangGraph orchestration
+│   │   ├── state.py         # DraxState TypedDict
+│   │   ├── supervisor.py    # Intent classification
+│   │   ├── nodes.py         # All agent node functions
+│   │   └── graph.py         # Graph assembly + edges
 │   ├── bot/
-│   │   └── handlers/    # Telegram command and message handlers
-│   ├── models/          # PostgreSQL models
-│   ├── services/        # LLM (Claude/OpenAI/DeepSeek), Nutritionix, YouTube
-│   └── tasks/           # Celery scheduled tasks
-├── docker-compose.yml   # One-command local setup
+│   │   ├── handlers/        # Telegram command + message handlers
+│   │   ├── keyboards.py     # All inline keyboards
+│   │   └── bot.py           # Handler registration + routing
+│   ├── models/              # SQLAlchemy models (User, MealLog, etc.)
+│   ├── services/            # LLM, Nutritionix, YouTube API clients
+│   ├── tasks/               # Celery scheduled tasks
+│   ├── api/                 # FastAPI health sync endpoint
+│   ├── config.py            # Pydantic settings (from .env)
+│   ├── database.py          # Async SQLAlchemy engine
+│   └── main.py              # FastAPI app (webhook + sync API)
+├── alembic/                 # Database migrations
+├── docker-compose.yml       # One-command local setup
 ├── Dockerfile
-├── run_polling.py       # Local development entry point
-└── .env.example         # Template — copy to .env and fill in keys
+├── run_polling.py           # Local development entry point
+├── .env.example             # Annotated config template
+├── DEPLOY.md                # Hosting guides
+└── CONTRIBUTING.md          # How to contribute
 ```
 
 ---
 
 ## Contributing
 
-PRs are welcome! See [CONTRIBUTING.md](.github/CONTRIBUTING.md).
+PRs are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md).
 
-Ideas:
-- [ ] Food photo AI detection
-- [ ] Apple Health / Google Fit sync
-- [ ] Multi-language support
-- [ ] Macro targets (not just calories)
-- [ ] Gym schedule / rest day detection
+Ideas for future contributions:
+- [ ] Group challenges between users
+- [ ] Meal plans by cuisine (Mediterranean, Indian, etc.)
+- [ ] Progressive overload tracking (auto-increment weights week-over-week)
+- [ ] Heart rate zone training via health sync
+- [ ] Export data to CSV / Google Sheets
 
 ---
 
 ## License
 
-MIT — free to use, fork, and build on.
+Apache 2.0 — free to use, fork, modify, and build on. See [LICENSE](LICENSE).
 
 ---
 
 Built with Claude AI, LangGraph, python-telegram-bot, and FastAPI.
-If this helps you, star the repo ⭐ — it helps others find it.
+If this helps you, star the repo ⭐

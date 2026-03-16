@@ -45,32 +45,36 @@ class HydrationAgent(BaseAgent):
 
     def parse_water_amount(self, text: str) -> int | None:
         text = text.lower().strip()
+        result = None
         if "l" in text and "ml" not in text:
             try:
-                return int(float(text.replace("litre", "").replace("liter", "").replace("l", "").strip()) * 1000)
+                result = int(float(text.replace("litre", "").replace("liter", "").replace("l", "").strip()) * 1000)
             except ValueError:
                 pass
-        if "ml" in text:
+        elif "ml" in text:
             try:
-                return int(float(text.replace("ml", "").strip()))
+                result = int(float(text.replace("ml", "").strip()))
             except ValueError:
                 pass
-        if "glass" in text or "cup" in text:
+        elif "glass" in text or "cup" in text:
             try:
-                return int(float(text.split()[0]) * 250)
+                result = int(float(text.split()[0]) * 250)
             except (ValueError, IndexError):
-                return 250
-        if "bottle" in text:
+                result = 250
+        elif "bottle" in text:
             try:
-                return int(float(text.split()[0]) * 500)
+                result = int(float(text.split()[0]) * 500)
             except (ValueError, IndexError):
-                return 500
-        try:
-            val = int(float(text.split()[0]))
-            if 50 <= val <= 5000:
-                return val
-        except (ValueError, IndexError):
-            pass
+                result = 500
+        else:
+            try:
+                val = int(float(text.split()[0]))
+                if 50 <= val <= 5000:
+                    return val
+            except (ValueError, IndexError):
+                pass
+        if result is not None and 50 <= result <= 5000:
+            return result
         return None
 
     def get_hydration_tip(self, consumed_ml: int, target_ml: int) -> str:

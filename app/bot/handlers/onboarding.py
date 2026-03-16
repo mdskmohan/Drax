@@ -55,6 +55,15 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(
                 "🏋️ *Welcome to Drax — Your AI Personal Fitness Coach!*\n\n"
                 "I'm here to help you lose weight, build strength, and transform your life.\n\n"
+                "━━━━━━━━━━━━━━━━\n"
+                "⚕️ *Health Advisory*\n"
+                "Drax provides general fitness and nutrition guidance based on international standards "
+                "(Mifflin-St Jeor formula, ACSM exercise guidelines, WHO/AND nutrition recommendations). "
+                "*This is not medical advice.*\n\n"
+                "Before starting any new diet or exercise programme — especially if you have existing "
+                "health conditions, are pregnant, or take medication — please consult a *qualified doctor, "
+                "registered dietitian, or certified personal trainer.*\n"
+                "━━━━━━━━━━━━━━━━\n\n"
                 "Let's get started with a quick setup (takes 2 minutes).\n\n"
                 "👋 What's your *full name*?",
                 parse_mode="Markdown",
@@ -95,14 +104,23 @@ async def handle_onboarding_message(update: Update, context: ContextTypes.DEFAUL
         elif state == OnboardingState.collecting_age:
             try:
                 age = int(text)
-                if not 10 <= age <= 100:
+                if not 13 <= age <= 100:
                     raise ValueError
                 user.age = age
                 user.onboarding_state = OnboardingState.collecting_gender
                 await session.commit()
+                if age < 18:
+                    await update.message.reply_text(
+                        "⚕️ *Advisory for users under 18:*\n\n"
+                        "Calorie targets and workout plans on Drax are designed for adults. "
+                        "Teenagers have higher nutritional needs for growth and development.\n\n"
+                        "Please discuss any diet or exercise changes with a *parent/guardian* "
+                        "and a *paediatrician or registered dietitian* before following this plan.",
+                        parse_mode="Markdown",
+                    )
                 await update.message.reply_text("What is your gender?", reply_markup=gender_keyboard())
             except ValueError:
-                await update.message.reply_text("Please enter a valid age (e.g., 28)")
+                await update.message.reply_text("Please enter a valid age (13–100)")
 
         elif state == OnboardingState.collecting_height:
             try:
@@ -158,8 +176,25 @@ async def handle_onboarding_message(update: Update, context: ContextTypes.DEFAUL
                 user.timeline_months = months
                 user.onboarding_state = OnboardingState.collecting_diet
                 await session.commit()
+
+                # Check implied weekly loss rate against safe guidelines
+                timeline_note = ""
+                if user.weight_to_lose_kg and months:
+                    implied_rate = user.weight_to_lose_kg / (months * 4.33)
+                    # Safe upper limit: 1.0 kg/week (WHO/AND guidelines)
+                    if implied_rate > 1.0:
+                        safe_months = round(user.weight_to_lose_kg / (0.5 * 4.33))
+                        timeline_note = (
+                            f"\n\n⚠️ *Timeline check:*\n"
+                            f"Your goal implies losing ~{implied_rate:.1f} kg/week, which exceeds the "
+                            f"safe guideline of 1.0 kg/week (WHO/AND). "
+                            f"Drax will target a safe 500 kcal deficit (~0.45 kg/week).\n"
+                            f"A realistic timeline for your goal is ~*{safe_months} months*. "
+                            f"Sustainable loss preserves muscle and keeps the weight off long-term. 💪"
+                        )
+
                 await update.message.reply_text(
-                    f"*{months} months* — solid! 🗓️\n\nWhat is your diet preference?",
+                    f"*{months} months* — noted! 🗓️{timeline_note}\n\nWhat is your diet preference?",
                     parse_mode="Markdown",
                     reply_markup=diet_keyboard(),
                 )
@@ -343,10 +378,13 @@ async def handle_onboarding_callback(update: Update, context: ContextTypes.DEFAU
             user.onboarding_state = OnboardingState.completed
 
             # Calculate targets
+            # Apply 500 kcal/day deficit (safe rate per AND/WHO: ~0.45 kg/week)
+            # Enforce minimum floor per Academy of Nutrition and Dietetics (AND):
+            #   Women: 1200 kcal/day minimum | Men: 1500 kcal/day minimum
             if user.tdee:
-                user.daily_calorie_target = round(user.tdee - 500)
+                user.daily_calorie_target = max(round(user.tdee - 500), user.safe_calorie_floor)
             else:
-                user.daily_calorie_target = 1800
+                user.daily_calorie_target = max(1800, user.safe_calorie_floor)
             user.calculate_macros()
 
             from app.agents.hydration_agent import HydrationAgent
@@ -377,7 +415,10 @@ async def handle_onboarding_callback(update: Update, context: ContextTypes.DEFAU
                 f"🏋️ Training: *{schedule_text}*\n"
                 f"⚙️ Equipment: *{equip_text}*\n"
                 f"🌐 Language: *{lang_name}*\n\n"
-                f"Let's *crush this goal* together! 💪",
+                f"Let's *crush this goal* together! 💪\n\n"
+                f"━━━━━━━━━━━━\n"
+                f"_Your targets are calculated using the Mifflin-St Jeor formula and ACSM guidelines. "
+                f"For personalised clinical advice, consider consulting a registered dietitian or certified personal trainer._",
                 parse_mode="Markdown",
                 reply_markup=main_menu_keyboard(),
             )

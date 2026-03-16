@@ -18,7 +18,6 @@ Intent = Literal[
     "get_motivation",
     "get_plan",
     "report_pain",
-    "scan_equipment",
     "general",
 ]
 
