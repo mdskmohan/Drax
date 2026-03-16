@@ -40,7 +40,7 @@ Your evening time  → Check-in: calories, water, workout summary
 Your chosen day    → Full weekly progress report with trend analysis
 ```
 
-All times and days are **fully configurable per-user** via `/notifications`. You set your schedule — Drax respects it.
+All times and days are **fully configurable** via `/notifications`. You set your schedule — Drax respects it.
 
 ---
 
@@ -289,7 +289,7 @@ Drax sends you automatic messages throughout the day. Every notification is full
 
 **To configure:** Send `/notifications` or tap **Settings** in the main menu.
 
-All times are in **your local timezone** (set via `user.timezone`, default: `Asia/Kolkata`). Drax handles every timezone worldwide.
+All times are in **your local timezone**. The default is `Asia/Kolkata` — change `timezone` in your user profile if needed. Drax works in any timezone.
 
 ---
 
@@ -300,14 +300,13 @@ For personal use, the API costs are minimal:
 | LLM call type | Frequency | Estimated cost |
 |---|---|---|
 | Meal parsing (fast model) | Every meal logged | ~$0.0001 per meal |
-| Workout generation (main model, cached 24h) | Once per day | ~$0.005–0.02 |
+| Workout generation (main model, cached daily) | Once per day | ~$0.005–0.02 |
 | Weekly report (main model) | Once per week | ~$0.01–0.05 |
-| Intent classification (fast/rule-based) | Every message | ~$0.00001 |
-| Motivation / weight feedback (fast) | On demand | ~$0.0001 |
-| **Total — 1 active user/month** | | **~$1–5/month** |
-| **Total — 10 active users/month** | | **~$5–20/month** |
+| Intent classification (fast / rule-based) | Every message | ~$0.00001 |
+| Motivation / weight feedback (fast model) | On demand | ~$0.0001 |
+| **Total for personal use per month** | | **~$1–5/month** |
 
-Nutritionix and YouTube are free at typical usage levels. Hosting on Railway free tier costs $0 until you exceed $5/month credit.
+Nutritionix and YouTube are both free within their daily limits. Hosting on Railway free tier costs $0 until you exceed their $5/month credit.
 
 ---
 
@@ -374,7 +373,7 @@ LangGraph (supervisor + agent nodes)
 PostgreSQL (all user data + logs)
 
 Celery + Redis (scheduled notifications)
-  └── Runs every 30 min → checks each user's configured time in their timezone
+  └── Runs every 30 min → checks your configured time in your timezone
 ```
 
 ### What actually calls the LLM (cost transparency)
@@ -453,11 +452,10 @@ drax/
 PRs are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 Ideas for future contributions:
-- [ ] Group challenges between users
-- [ ] Meal plans by cuisine (Mediterranean, Indian, etc.)
+- [ ] Meal plans by cuisine (Mediterranean, Indian, Japanese, etc.)
 - [ ] Progressive overload tracking (auto-increment weights week-over-week)
 - [ ] Heart rate zone training via health sync
-- [ ] Export data to CSV / Google Sheets
+- [ ] Export progress data to CSV
 
 ---
 

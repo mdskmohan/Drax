@@ -9,9 +9,10 @@ git clone https://github.com/YOUR_USERNAME/drax.git
 cd drax
 python -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env   # fill in your keys
-docker-compose up db -d
-python run_polling.py
+cp .env.example .env          # fill in TELEGRAM_BOT_TOKEN and one LLM key
+docker compose up db redis -d # start PostgreSQL + Redis
+alembic upgrade head          # run migrations
+python run_polling.py         # start the bot
 ```
 
 ## How to Contribute
