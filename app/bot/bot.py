@@ -63,11 +63,6 @@ from app.bot.handlers.notifications import (
     handle_notification_callback,
     process_notif_time_input,
 )
-from app.bot.handlers.privacy import (
-    privacy_command,
-    delete_my_data_command,
-    handle_delete_confirm_callback,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -123,11 +118,6 @@ async def route_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Central callback query router."""
     query = update.callback_query
     data = query.data
-
-    # Data deletion confirmation
-    if data == "confirm_delete_data":
-        await handle_delete_confirm_callback(update, context)
-        return
 
     # Notification settings callbacks
     if data.startswith("notif_"):
@@ -213,8 +203,6 @@ def build_application() -> Application:
     app.add_handler(CommandHandler("equipment", equipment_command))
     app.add_handler(CommandHandler("sync", sync_command))
     app.add_handler(CommandHandler("notifications", notifications_command))
-    app.add_handler(CommandHandler("privacy", privacy_command))
-    app.add_handler(CommandHandler("delete_my_data", delete_my_data_command))
 
     # Photos — equipment detection first, then food photo fallback
     async def route_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):

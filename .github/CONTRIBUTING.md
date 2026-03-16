@@ -56,4 +56,4 @@ Open an issue with:
 
 ## License
 
-By contributing, you agree that your contributions will be licensed under the Apache 2.0 License.
+By contributing, you agree that your contributions will be licensed under the MIT License.
