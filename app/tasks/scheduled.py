@@ -5,6 +5,8 @@ All times are evaluated in the user's own timezone (user.timezone).
 """
 import asyncio
 import logging
+import random
+from collections import Counter, defaultdict
 from datetime import datetime, timezone, timedelta
 
 from app.tasks.celery_app import celery_app
@@ -401,7 +403,6 @@ async def _async_water_reminder():
     from app.database import AsyncSessionLocal
     from app.models.user import User, OnboardingState
     from app.models.water_log import WaterLog
-    import random
 
     bot = Bot(token=settings.telegram_bot_token)
     today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
@@ -550,7 +551,6 @@ async def _async_weekly_report():
                     )).scalars().all()
 
                     # Count skips per day of week
-                    from collections import Counter
                     skip_days = Counter(
                         wl.scheduled_date.strftime("%A")
                         for wl in skipped_logs
@@ -589,7 +589,6 @@ async def _async_weekly_report():
                             "Mexican", "Italian", "Chinese",
                         ]
                         alternatives = [c for c in _OTHER_CUISINES if c.lower() != cuisine.lower()]
-                        import random
                         suggestion = random.choice(alternatives)
                         try:
                             await bot.send_message(

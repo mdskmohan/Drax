@@ -83,7 +83,7 @@ Return JSON: {{"trend": "on_track|ahead|behind|plateau", "analysis": "2-3 senten
         return f"[{bar}] {round(pct*100)}%\nLost: {round(lost,1)}kg / {round(total,1)}kg | Remaining: {round(total-lost,1)}kg"
 
     def _compute_week_stats(self, weight_logs, meal_logs, workout_logs, water_logs, calorie_target, water_target):
-        avg_cal = sum(m.get("calories", 0) for m in meal_logs) / len(meal_logs) if meal_logs else 0
+        avg_cal = sum(m.get("calories", 0) for m in meal_logs) / 7
         avg_water = sum(w.get("amount_ml", 0) for w in water_logs) / 7
         completed = sum(1 for w in workout_logs if w.get("completed"))
         weight_change = (weight_logs[-1].get("weight_kg", 0) - weight_logs[0].get("weight_kg", 0)) if len(weight_logs) >= 2 else None

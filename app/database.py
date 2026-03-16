@@ -36,6 +36,6 @@ async def get_db() -> AsyncSession:
 
 async def init_db():
     """Create all tables on startup."""
-    from app.models import user, meal_log, water_log, workout_log, weight_log, progress_report  # noqa
+    from app.models import user, meal_log, water_log, workout_log, weight_log, progress_report, exercise_log  # noqa
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)

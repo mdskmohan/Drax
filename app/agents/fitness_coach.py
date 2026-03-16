@@ -1,6 +1,7 @@
 """
 Fitness Coach Agent — Claude Sonnet for workout generation, with daily caching.
 """
+from collections import defaultdict
 from datetime import date
 from app.agents.base_agent import BaseAgent
 from app.models.user import User
@@ -66,7 +67,6 @@ class FitnessCoachAgent(BaseAgent):
         overload_context = ""
         if exercise_history:
             # Group entries by exercise name (most recent first)
-            from collections import defaultdict
             by_exercise: dict[str, list] = defaultdict(list)
             for entry in exercise_history:
                 by_exercise[entry.get("exercise_name", "?")].append(entry)

@@ -238,12 +238,21 @@ async def log_weight_node(state: DraxState) -> dict:
         db_user = result.scalar_one()
         old_weight = db_user.current_weight_kg
         db_user.current_weight_kg = weight
+        # Fetch earliest weight log for correct all-time progress bar start
+        first_log_r = await session.execute(
+            select(WeightLog)
+            .where(WeightLog.user_id == user.id)
+            .order_by(WeightLog.logged_at)
+            .limit(1)
+        )
+        first_log = first_log_r.scalar_one_or_none()
+        start_weight = first_log.weight_kg if first_log else old_weight
         await session.commit()
 
     change = (old_weight - weight) if old_weight else 0
     bar = ""
-    if user.goal_weight_kg and old_weight:
-        bar = "\n" + _progress.build_progress_bar(weight, old_weight, user.goal_weight_kg) + "\n"
+    if user.goal_weight_kg and start_weight:
+        bar = "\n" + _progress.build_progress_bar(weight, start_weight, user.goal_weight_kg) + "\n"
 
     response = (
         f"⚖️ *Weight logged: {weight}kg*\n"
