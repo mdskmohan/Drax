@@ -25,8 +25,11 @@ def main_menu_keyboard() -> InlineKeyboardMarkup:
             InlineKeyboardButton("⚙️ Equipment", callback_data="equipment"),
         ],
         [
-            InlineKeyboardButton("📱 Health Sync", callback_data="sync"),
+            InlineKeyboardButton("🍽️ Cuisine Style", callback_data="cuisine_menu"),
             InlineKeyboardButton("⚙️ Settings", callback_data="settings"),
+        ],
+        [
+            InlineKeyboardButton("📱 Health Sync", callback_data="sync"),
         ],
     ])
 
@@ -356,6 +359,53 @@ def notification_hour_keyboard(notif_type: str, subtype: str = "") -> InlineKeyb
         ]
         rows.append(row)
     rows.append([InlineKeyboardButton("← Back", callback_data=f"notif_view_{notif_type}")])
+    return InlineKeyboardMarkup(rows)
+
+
+# ── Cuisine Preference ─────────────────────────────────────────────────────────
+
+_CUISINES = [
+    ("🌊 Mediterranean", "mediterranean"),
+    ("🇮🇳 Indian",        "indian"),
+    ("🇯🇵 Japanese",      "japanese"),
+    ("🇲🇽 Mexican",       "mexican"),
+    ("🇮🇹 Italian",       "italian"),
+    ("🇨🇳 Chinese",       "chinese"),
+    ("🌍 General",        "general"),
+]
+
+
+def cuisine_keyboard(current: str | None = None) -> InlineKeyboardMarkup:
+    """Cuisine selection keyboard. Current selection shows a checkmark."""
+    rows = []
+    for i in range(0, len(_CUISINES), 2):
+        row = []
+        for label, key in _CUISINES[i:i + 2]:
+            is_current = (key == current) or (key == "general" and not current)
+            btn_label = f"✅ {label}" if is_current else label
+            row.append(InlineKeyboardButton(btn_label, callback_data=f"cuisine_{key}"))
+        rows.append(row)
+    rows.append([InlineKeyboardButton("← Back to Menu", callback_data="cancel")])
+    return InlineKeyboardMarkup(rows)
+
+
+# ── Progressive Overload — Weight Logging ──────────────────────────────────────
+
+def log_weights_prompt_keyboard() -> InlineKeyboardMarkup:
+    """Shown after workout completion — offer to log exercise weights."""
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("📊 Log weights (progressive overload)", callback_data="overload_start")],
+        [InlineKeyboardButton("⏭️ Skip", callback_data="overload_skip")],
+    ])
+
+
+def exercise_weight_actions_keyboard(exercise_name: str, remaining: int) -> InlineKeyboardMarkup:
+    """Shown while logging weights for one exercise."""
+    rows = [
+        [InlineKeyboardButton("⏭️ Skip this exercise", callback_data="overload_next")],
+    ]
+    if remaining > 0:
+        rows.append([InlineKeyboardButton("✅ Done logging weights", callback_data="overload_skip")])
     return InlineKeyboardMarkup(rows)
 
 

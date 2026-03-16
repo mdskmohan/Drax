@@ -53,6 +53,8 @@ All times and days are **fully configurable** via `/notifications`. You set your
 | 💧 **Hydration Tracking** | `"drank 500ml"` or tap `/water` → quick log buttons |
 | 🏋️ **Personalised Workouts** | `/workout` — plan adapts to your equipment, level, and schedule |
 | 🏠 **Equipment-Aware Plans** | `/equipment` — tell Drax what you have or send a gym photo |
+| 🍜 **Cuisine-style meal plans** | `/cuisine` — pick Mediterranean, Indian, Japanese, Mexican, Italian, Chinese, or General |
+| 📈 **Progressive Overload** | Log weights after each workout — next session auto-suggests heavier weights |
 | 📋 **Daily Plan** | `/plan` — full meal + workout plan in one message |
 | ⚖️ **Weight Logging** | `/weight` — AI feedback + progress bar every time you log |
 | 📊 **Progress Dashboard** | `/progress` — weight journey, calories, water, workout streak |
@@ -254,6 +256,7 @@ The bot is fully ready the moment onboarding completes. No further setup needed.
 | `/report` | Generate a detailed AI weekly progress report on demand |
 | `/motivation` | Get a personalised motivational message |
 | `/equipment` | Update your gym equipment (select, toggle, or scan a photo) |
+| `/cuisine` | Set your meal plan cuisine style (Indian, Mediterranean, Japanese, etc.) |
 | `/notifications` | Configure when and which days you receive each notification |
 | `/sync` | Connect Apple Health or Google Fit via webhook |
 | `/help` | Show all commands |
@@ -470,8 +473,6 @@ drax/
 PRs are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 Ideas for future contributions:
-- [ ] Meal plans by cuisine (Mediterranean, Indian, Japanese, etc.)
-- [ ] Progressive overload tracking (auto-increment weights week-over-week)
 - [ ] Heart rate zone training via health sync
 - [ ] Export progress data to CSV
 

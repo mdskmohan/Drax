@@ -36,6 +36,8 @@ from app.bot.handlers.workouts import (
     show_todays_workout,
     workout_completion_callback,
     process_pain_report,
+    handle_overload_callback,
+    process_exercise_weight_input,
 )
 from app.bot.handlers.progress import (
     log_weight_start,
@@ -63,6 +65,7 @@ from app.bot.handlers.notifications import (
     handle_notification_callback,
     process_notif_time_input,
 )
+from app.bot.handlers.cuisine import cuisine_command, handle_cuisine_callback
 
 logger = logging.getLogger(__name__)
 
@@ -98,6 +101,8 @@ async def route_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE)
             return
         if await equipment_photo_handler(update, context):
             return
+        if await process_exercise_weight_input(update, context):
+            return
         if await process_pain_report(update, context):
             return
 
@@ -118,6 +123,19 @@ async def route_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Central callback query router."""
     query = update.callback_query
     data = query.data
+
+    # Cuisine preference
+    if data == "cuisine_menu":
+        await cuisine_command(update, context)
+        return
+    if data.startswith("cuisine_"):
+        await handle_cuisine_callback(update, context)
+        return
+
+    # Progressive overload weight-logging callbacks
+    if data.startswith("overload_"):
+        await handle_overload_callback(update, context)
+        return
 
     # Notification settings callbacks
     if data.startswith("notif_"):
@@ -203,6 +221,7 @@ def build_application() -> Application:
     app.add_handler(CommandHandler("equipment", equipment_command))
     app.add_handler(CommandHandler("sync", sync_command))
     app.add_handler(CommandHandler("notifications", notifications_command))
+    app.add_handler(CommandHandler("cuisine", cuisine_command))
 
     # Photos — equipment detection first, then food photo fallback
     async def route_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):

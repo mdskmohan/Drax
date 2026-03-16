@@ -74,13 +74,23 @@ Give 2-3 sentences of helpful feedback on the meal quality and remaining calorie
 
     async def generate_daily_meal_plan(self, user: User) -> dict:
         calorie_target = user.daily_calorie_target or (round(user.tdee - 500) if user.tdee else 1800)
+        diet = user.diet_preference.value if user.diet_preference else "omnivore"
+        cuisine = getattr(user, "cuisine_preference", None) or "general"
+        cuisine_instruction = (
+            f"All meals must follow *{cuisine} cuisine* — use traditional ingredients, "
+            f"flavour profiles, and cooking methods typical of {cuisine} cooking."
+            if cuisine != "general"
+            else "Cuisine style: any balanced variety."
+        )
         return await llm.json(
             messages=[{"role": "user", "content": f"""Create a complete daily meal plan targeting {calorie_target} calories.
-Diet: {user.diet_preference.value if user.diet_preference else 'omnivore'}
+Diet: {diet}
+{cuisine_instruction}
 
 Return JSON:
 {{
   "calorie_target": {calorie_target},
+  "cuisine": "{cuisine}",
   "meals": {{
     "breakfast": {{"description": "...", "calories": 0, "protein_g": 0, "carbs_g": 0, "fat_g": 0, "prep_time_min": 0}},
     "lunch": {{"description": "...", "calories": 0, "protein_g": 0, "carbs_g": 0, "fat_g": 0, "prep_time_min": 0}},

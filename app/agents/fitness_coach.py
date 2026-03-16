@@ -53,6 +53,7 @@ class FitnessCoachAgent(BaseAgent):
         day_of_week: str,
         recent_workouts: list[dict] | None = None,
         is_gym_day: bool = True,
+        exercise_history: list[dict] | None = None,
     ) -> dict:
         # Return cached plan if already generated today
         cache_key = (user.id, date.today(), day_of_week)
@@ -60,6 +61,23 @@ class FitnessCoachAgent(BaseAgent):
             return _workout_cache[cache_key]
 
         recent_summary = f"\nRecent workouts: {recent_workouts}" if recent_workouts else ""
+
+        # Progressive overload context — format recent performance per exercise
+        overload_context = ""
+        if exercise_history:
+            lines = ["\nRecent exercise performance (use for progressive overload):"]
+            for entry in exercise_history[:15]:  # last 15 entries across all exercises
+                name = entry.get("exercise_name", "?")
+                w = f"{entry['weight_kg']}kg" if entry.get("weight_kg") else "bodyweight"
+                reps = entry.get("reps", "?")
+                sets = entry.get("sets", "?")
+                date_str = entry.get("logged_at", "")[:10]
+                lines.append(f"  • {name}: {sets}×{reps} @ {w} ({date_str})")
+            lines.append(
+                "Apply progressive overload: suggest ~2.5–5% more weight OR 1 extra rep "
+                "compared to the last recorded session for each exercise above."
+            )
+            overload_context = "\n".join(lines)
 
         # Build equipment context
         if user.equipment_list:
@@ -75,8 +93,9 @@ class FitnessCoachAgent(BaseAgent):
             {
                 "role": "user",
                 "content": f"""Generate a complete {day_of_week} workout plan.
-Is gym day: {is_gym_day}{recent_summary}{equipment_context}
+Is gym day: {is_gym_day}{recent_summary}{equipment_context}{overload_context}
 Customize ALL exercises based on available equipment above.
+Where exercise history is provided above, apply progressive overload and include the suggested weight in the exercise notes.
 
 Return JSON with this exact structure:
 {{

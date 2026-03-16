@@ -106,6 +106,10 @@ class User(Base):
     equipment_list = Column(JSON, default=list)         # ["barbell", "dumbbells", "cable machine", ...]
     equipment_setup = Column(String(20), default="gym") # gym | home | bodyweight
 
+    # Cuisine preference for meal plan generation
+    # e.g. "indian" | "mediterranean" | "japanese" | "mexican" | "italian" | "chinese" | None (general)
+    cuisine_preference = Column(String(50), nullable=True)
+
     # Apple Health / Google Health Connect sync
     health_sync_token = Column(String(64), nullable=True, unique=True)
 

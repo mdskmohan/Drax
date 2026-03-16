@@ -158,11 +158,37 @@ async def log_water_node(state: DraxState) -> dict:
 # ── Node: Workout generation ──────────────────────────────────────────────────
 
 async def get_workout_node(state: DraxState) -> dict:
-    """Generate today's workout plan."""
+    """Generate today's workout plan, with progressive overload from exercise history."""
+    from datetime import timedelta
+    from app.models.exercise_log import ExerciseLog
+
     user = state["user"]
     day = datetime.now().strftime("%A")
 
-    plan = await _coach.generate_daily_workout(user, day_of_week=day, is_gym_day=True)
+    # Fetch last 4 weeks of exercise logs for progressive overload
+    four_weeks_ago = datetime.now(timezone.utc) - timedelta(weeks=4)
+    async with AsyncSessionLocal() as session:
+        logs_result = await session.execute(
+            select(ExerciseLog)
+            .where(ExerciseLog.user_id == user.id)
+            .where(ExerciseLog.logged_at >= four_weeks_ago)
+            .order_by(ExerciseLog.logged_at.desc())
+        )
+        exercise_history = [
+            {
+                "exercise_name": log.exercise_name,
+                "weight_kg": log.weight_kg,
+                "reps": log.reps,
+                "sets": log.sets,
+                "logged_at": str(log.logged_at),
+            }
+            for log in logs_result.scalars().all()
+        ]
+
+    plan = await _coach.generate_daily_workout(
+        user, day_of_week=day, is_gym_day=True,
+        exercise_history=exercise_history or None,
+    )
 
     # Format
     formatted = plan.get("formatted_plan") or _format_plan(plan)
@@ -311,13 +337,30 @@ async def get_motivation_node(state: DraxState) -> dict:
 
 async def get_plan_node(state: DraxState) -> dict:
     """Generate full day plan: meal plan + workout plan."""
+    from datetime import timedelta
+    from app.models.exercise_log import ExerciseLog
+
     user = state["user"]
     day = datetime.now().strftime("%A, %B %d")
     week_day = datetime.now().strftime("%A")
 
+    four_weeks_ago = datetime.now(timezone.utc) - timedelta(weeks=4)
+    async with AsyncSessionLocal() as session:
+        logs_result = await session.execute(
+            select(ExerciseLog)
+            .where(ExerciseLog.user_id == user.id)
+            .where(ExerciseLog.logged_at >= four_weeks_ago)
+            .order_by(ExerciseLog.logged_at.desc())
+        )
+        exercise_history = [
+            {"exercise_name": l.exercise_name, "weight_kg": l.weight_kg,
+             "reps": l.reps, "sets": l.sets, "logged_at": str(l.logged_at)}
+            for l in logs_result.scalars().all()
+        ] or None
+
     meal_plan, workout_plan = await _run_parallel(
         _nutrition.generate_daily_meal_plan(user),
-        _coach.generate_daily_workout(user, day_of_week=week_day),
+        _coach.generate_daily_workout(user, day_of_week=week_day, exercise_history=exercise_history),
     )
 
     response = (

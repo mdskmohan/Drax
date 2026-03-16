@@ -9,9 +9,13 @@ from sqlalchemy import select
 from app.database import AsyncSessionLocal
 from app.models.user import User
 from app.models.workout_log import WorkoutLog
+from app.models.exercise_log import ExerciseLog
 from app.agents.fitness_coach import FitnessCoachAgent
 from app.agents.recovery_agent import RecoveryAgent
-from app.bot.keyboards import workout_done_keyboard, main_menu_keyboard
+from app.bot.keyboards import (
+    workout_done_keyboard, main_menu_keyboard,
+    log_weights_prompt_keyboard, exercise_weight_actions_keyboard,
+)
 
 
 coach = FitnessCoachAgent()
@@ -113,16 +117,25 @@ async def workout_completion_callback(update: Update, context: ContextTypes.DEFA
                 workout_log.completed_at = datetime.now(timezone.utc)
             await session.commit()
 
+            # Store the main exercises for the weight-logging flow
+            exercises = []
+            if workout_log and workout_log.exercises:
+                exercises = [
+                    e.get("exercise", "") for e in workout_log.exercises
+                    if e.get("exercise") and e.get("sets")  # skip bodyweight/cardio with no sets
+                ]
+            context.user_data["overload_exercises"] = exercises
+            context.user_data["overload_index"] = 0
+            context.user_data["overload_workout_id"] = workout_id
+
             await query.edit_message_text(
-                "🎉 *BEAST MODE ACTIVATED!*\n\n"
-                "You just crushed your workout! Every rep counts. "
-                "Your body is changing right now. 💪\n\n"
-                "Remember to:\n"
-                "✅ Drink 500ml water now\n"
-                "✅ Eat a protein-rich meal within 30 min\n"
-                "✅ Rest and recover tonight",
+                "🎉 *Workout Complete!* 💪\n\n"
+                "Great work! Log the weights you used to enable "
+                "*progressive overload tracking* — next session will automatically "
+                "suggest heavier weights.\n\n"
+                "_Takes 30 seconds. Highly recommended._",
                 parse_mode="Markdown",
-                reply_markup=main_menu_keyboard(),
+                reply_markup=log_weights_prompt_keyboard(),
             )
 
         elif data == "workout_partial":
@@ -169,6 +182,167 @@ async def workout_completion_callback(update: Update, context: ContextTypes.DEFA
                 "_e.g., 'sharp pain in right knee during squats', 'lower back soreness'_",
                 parse_mode="Markdown",
             )
+
+
+async def handle_overload_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
+    """
+    Handle overload_start / overload_next / overload_skip callbacks.
+    Returns True if handled.
+    """
+    query = update.callback_query
+    data = query.data
+    if not data.startswith("overload_"):
+        return False
+
+    await query.answer()
+
+    exercises = context.user_data.get("overload_exercises", [])
+    idx = context.user_data.get("overload_index", 0)
+
+    if data == "overload_skip" or not exercises:
+        # Done — clear state, show main menu
+        context.user_data.pop("overload_exercises", None)
+        context.user_data.pop("overload_index", None)
+        context.user_data.pop("overload_workout_id", None)
+        context.user_data.pop("awaiting_exercise_weight", None)
+        await query.edit_message_text(
+            "✅ *All done!*\n\n"
+            "Remember to:\n"
+            "• Drink 500ml water\n"
+            "• Eat protein within 30 min\n"
+            "• Sleep 8 hours for recovery 💤",
+            parse_mode="Markdown",
+            reply_markup=main_menu_keyboard(),
+        )
+        return True
+
+    if data in ("overload_start", "overload_next"):
+        if data == "overload_next":
+            idx += 1
+            context.user_data["overload_index"] = idx
+
+        if idx >= len(exercises):
+            # All exercises logged
+            context.user_data.pop("overload_exercises", None)
+            context.user_data.pop("overload_index", None)
+            context.user_data.pop("awaiting_exercise_weight", None)
+            await query.edit_message_text(
+                "📊 *Weights logged!*\n\n"
+                "Progressive overload data saved. Next session will suggest "
+                "heavier weights automatically. 🏋️\n\n"
+                "• Drink 500ml water\n"
+                "• Eat protein within 30 min",
+                parse_mode="Markdown",
+                reply_markup=main_menu_keyboard(),
+            )
+            return True
+
+        exercise_name = exercises[idx]
+        remaining = len(exercises) - idx - 1
+        context.user_data["awaiting_exercise_weight"] = exercise_name
+        await query.edit_message_text(
+            f"📊 *{exercise_name}*\n\n"
+            f"What weight did you use? (e.g., `80kg`, `80`, or `bodyweight`)\n\n"
+            f"_{remaining} exercise{'s' if remaining != 1 else ''} after this_",
+            parse_mode="Markdown",
+            reply_markup=exercise_weight_actions_keyboard(exercise_name, remaining),
+        )
+
+    return True
+
+
+async def process_exercise_weight_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
+    """
+    Handle free-text weight input during the progressive overload logging flow.
+    Returns True if consumed.
+    """
+    exercise_name = context.user_data.get("awaiting_exercise_weight")
+    if not exercise_name:
+        return False
+
+    text = update.message.text.strip().lower()
+    context.user_data.pop("awaiting_exercise_weight", None)
+
+    user_id = update.effective_user.id
+    workout_id = context.user_data.get("overload_workout_id")
+
+    # Parse weight
+    weight_kg = None
+    if text not in ("bodyweight", "bw", "none", "-"):
+        import re
+        m = re.search(r"(\d+(?:\.\d+)?)", text)
+        if m:
+            raw = float(m.group(1))
+            # If > 300 assume lbs, convert
+            weight_kg = round(raw * 0.453592, 1) if raw > 300 else raw
+
+    # Parse reps/sets from workout plan if available
+    exercises = context.user_data.get("overload_exercises", [])
+    idx = context.user_data.get("overload_index", 0)
+    plan_exercises = []
+    if workout_id:
+        async with AsyncSessionLocal() as session:
+            wl = await session.execute(select(WorkoutLog).where(WorkoutLog.id == workout_id))
+            wl_obj = wl.scalar_one_or_none()
+            if wl_obj and wl_obj.exercises:
+                plan_exercises = wl_obj.exercises
+
+    sets, reps = None, None
+    for ex in plan_exercises:
+        if ex.get("exercise", "").lower() == exercise_name.lower():
+            sets = ex.get("sets")
+            reps_raw = ex.get("reps", "")
+            if reps_raw:
+                try:
+                    reps = int(str(reps_raw).split("-")[0])
+                except (ValueError, AttributeError):
+                    pass
+            break
+
+    async with AsyncSessionLocal() as session:
+        session.add(ExerciseLog(
+            user_id=user_id,
+            workout_log_id=workout_id,
+            exercise_name=exercise_name,
+            weight_kg=weight_kg,
+            sets=sets,
+            reps=reps,
+        ))
+        await session.commit()
+
+    weight_display = f"{weight_kg}kg" if weight_kg else "bodyweight"
+    sets_display = f"{sets}×{reps}" if sets and reps else ""
+    await update.message.reply_text(
+        f"✅ *{exercise_name}* — {sets_display} @ {weight_display} saved!",
+        parse_mode="Markdown",
+    )
+
+    # Advance to next exercise
+    idx += 1
+    context.user_data["overload_index"] = idx
+    if idx >= len(exercises):
+        context.user_data.pop("overload_exercises", None)
+        context.user_data.pop("overload_index", None)
+        context.user_data.pop("overload_workout_id", None)
+        await update.message.reply_text(
+            "📊 *All weights logged!* Progressive overload data saved.\n\n"
+            "Next workout will suggest progressive increases. 💪",
+            parse_mode="Markdown",
+            reply_markup=main_menu_keyboard(),
+        )
+    else:
+        next_exercise = exercises[idx]
+        remaining = len(exercises) - idx - 1
+        context.user_data["awaiting_exercise_weight"] = next_exercise
+        await update.message.reply_text(
+            f"📊 *{next_exercise}*\n\n"
+            f"What weight? (e.g., `80kg` or `bodyweight`)\n"
+            f"_{remaining} after this_",
+            parse_mode="Markdown",
+            reply_markup=exercise_weight_actions_keyboard(next_exercise, remaining),
+        )
+
+    return True
 
 
 async def process_pain_report(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
