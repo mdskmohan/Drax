@@ -523,6 +523,7 @@ async def _async_weekly_report():
                         )
                         if new_target and abs(new_target - (user.daily_calorie_target or 0)) >= 50:
                             user.daily_calorie_target = new_target
+                            user.calculate_macros()  # keep protein/carbs/fat in sync
                             await session.commit()
                             await bot.send_message(
                                 chat_id=user.id,
@@ -536,6 +537,73 @@ async def _async_weekly_report():
                             )
                     except Exception as e:
                         logger.warning(f"Calorie adjustment failed for {user.id}: {e}")
+
+                # Rest-day suggestion: check if any scheduled gym day was skipped ≥2/3 weeks
+                gym_schedule = user.gym_schedule or []
+                if gym_schedule:
+                    three_weeks_ago = datetime.now(timezone.utc) - timedelta(weeks=3)
+                    skipped_logs = (await session.execute(
+                        select(WorkoutLog)
+                        .where(WorkoutLog.user_id == user.id)
+                        .where(WorkoutLog.created_at >= three_weeks_ago)
+                        .where(WorkoutLog.completion_notes == "Skipped")
+                    )).scalars().all()
+
+                    # Count skips per day of week
+                    from collections import Counter
+                    skip_days = Counter(
+                        wl.scheduled_date.strftime("%A")
+                        for wl in skipped_logs
+                        if wl.scheduled_date
+                    )
+                    # Flag days in gym_schedule that were skipped 2+ times in 3 weeks
+                    problem_days = [
+                        day for day in gym_schedule
+                        if skip_days.get(day, 0) >= 2
+                    ]
+                    if problem_days:
+                        days_str = " and ".join(problem_days)
+                        try:
+                            await bot.send_message(
+                                chat_id=user.id,
+                                text=(
+                                    f"📅 *Schedule Suggestion*\n\n"
+                                    f"You've skipped *{days_str}* workouts multiple weeks in a row. "
+                                    f"That's completely normal — life gets in the way.\n\n"
+                                    f"Consider moving those to rest days and picking a day that works better for you. "
+                                    f"Use /notifications to update your gym schedule."
+                                ),
+                                parse_mode="Markdown",
+                            )
+                        except Exception as e:
+                            logger.warning(f"Rest-day suggestion failed for {user.id}: {e}")
+
+                # Cuisine rotation suggestion: if same cuisine for ≥3 weeks, suggest trying a new one
+                cuisine = getattr(user, "cuisine_preference", None)
+                cuisine_changed_at = getattr(user, "cuisine_last_changed_at", None)
+                if cuisine and cuisine_changed_at:
+                    weeks_on_cuisine = (datetime.now(timezone.utc) - cuisine_changed_at).days / 7
+                    if weeks_on_cuisine >= 3:
+                        _OTHER_CUISINES = [
+                            "Mediterranean", "Indian", "Japanese",
+                            "Mexican", "Italian", "Chinese",
+                        ]
+                        alternatives = [c for c in _OTHER_CUISINES if c.lower() != cuisine.lower()]
+                        import random
+                        suggestion = random.choice(alternatives)
+                        try:
+                            await bot.send_message(
+                                chat_id=user.id,
+                                text=(
+                                    f"🍽️ *Variety suggestion*\n\n"
+                                    f"You've been on *{cuisine.capitalize()} cuisine* for {int(weeks_on_cuisine)} weeks. "
+                                    f"Want to mix it up? Try *{suggestion}* this week for fresh flavours and new nutrients.\n\n"
+                                    f"Use /cuisine to switch anytime."
+                                ),
+                                parse_mode="Markdown",
+                            )
+                        except Exception as e:
+                            logger.warning(f"Cuisine rotation suggestion failed for {user.id}: {e}")
 
                 await _mark_sent(session, user, "weekly_report", now_local)
                 logger.info(f"Weekly report sent to {user.id}")

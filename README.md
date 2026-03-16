@@ -334,14 +334,14 @@ Every `/weight` entry is stored with a timestamp. The progress dashboard calcula
 - A visual progress bar toward your goal weight
 - AI feedback comparing today's log to recent trend
 
-### What does NOT auto-adapt (yet)
+### What else adapts
 
-| Feature | Status |
+| Feature | How |
 |---|---|
-| Macro split (protein/carb/fat %) | Static — set at onboarding; adjust manually if needed |
-| Workout volume (sets × reps) | Adapts via weight progression, not volume changes yet |
-| Rest day scheduling | Fixed to your gym schedule — change with `/notifications` |
-| Cuisine preference | Manual — use `/cuisine` to change |
+| **Macro targets** (protein/carbs/fat g) | Recalculated automatically whenever calorie target changes |
+| **Workout volume** (sets) | If same weight logged 3+ consecutive sessions (plateau), next workout suggests +1 set instead of +weight |
+| **Rest day scheduling** | If a gym day is skipped ≥2 weeks in a row, weekly report flags it and suggests rescheduling |
+| **Cuisine variety** | If same cuisine unchanged for ≥3 weeks, weekly report suggests a different one to try |
 
 ---
 

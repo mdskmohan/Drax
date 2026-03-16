@@ -65,17 +65,36 @@ class FitnessCoachAgent(BaseAgent):
         # Progressive overload context — format recent performance per exercise
         overload_context = ""
         if exercise_history:
+            # Group entries by exercise name (most recent first)
+            from collections import defaultdict
+            by_exercise: dict[str, list] = defaultdict(list)
+            for entry in exercise_history:
+                by_exercise[entry.get("exercise_name", "?")].append(entry)
+
             lines = ["\nRecent exercise performance (use for progressive overload):"]
-            for entry in exercise_history[:15]:  # last 15 entries across all exercises
-                name = entry.get("exercise_name", "?")
-                w = f"{entry['weight_kg']}kg" if entry.get("weight_kg") else "bodyweight"
-                reps = entry.get("reps", "?")
-                sets = entry.get("sets", "?")
-                date_str = entry.get("logged_at", "")[:10]
-                lines.append(f"  • {name}: {sets}×{reps} @ {w} ({date_str})")
+            for ex_name, entries in by_exercise.items():
+                # entries already ordered most-recent-first from the DB query
+                latest = entries[0]
+                w = f"{latest['weight_kg']}kg" if latest.get("weight_kg") else "bodyweight"
+                reps = latest.get("reps", "?")
+                sets = latest.get("sets", "?")
+                date_str = latest.get("logged_at", "")[:10]
+
+                # Plateau detection: same weight across last 3+ sessions → suggest +1 set
+                same_weight_streak = sum(
+                    1 for e in entries[:3]
+                    if e.get("weight_kg") and e["weight_kg"] == latest.get("weight_kg")
+                )
+                if same_weight_streak >= 3 and latest.get("weight_kg"):
+                    suggestion = f"plateau detected ({same_weight_streak} sessions at {w}) — add 1 set"
+                else:
+                    suggestion = "increase weight ~2.5–5% or add 1 rep"
+
+                lines.append(f"  • {ex_name}: {sets}×{reps} @ {w} ({date_str}) → {suggestion}")
+
             lines.append(
-                "Apply progressive overload: suggest ~2.5–5% more weight OR 1 extra rep "
-                "compared to the last recorded session for each exercise above."
+                "For each exercise above, apply the suggestion shown. "
+                "Include the recommended weight or sets change in the exercise notes field."
             )
             overload_context = "\n".join(lines)
 

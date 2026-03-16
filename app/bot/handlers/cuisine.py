@@ -2,6 +2,7 @@
 Cuisine preference handler.
 /cuisine — pick a cuisine style for all meal plans (Mediterranean, Indian, Japanese, etc.)
 """
+from datetime import datetime, timezone
 from telegram import Update
 from telegram.ext import ContextTypes
 from sqlalchemy import select
@@ -69,6 +70,7 @@ async def handle_cuisine_callback(update: Update, context: ContextTypes.DEFAULT_
         if not user:
             return True
         user.cuisine_preference = None if cuisine == "general" else cuisine
+        user.cuisine_last_changed_at = datetime.now(timezone.utc)
         await session.commit()
 
     label = _CUISINE_LABELS.get(cuisine, cuisine.capitalize())
