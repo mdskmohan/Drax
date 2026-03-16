@@ -458,9 +458,11 @@ async def _async_weekly_report():
     from app.models.water_log import WaterLog
     from app.models.workout_log import WorkoutLog
     from app.agents.progress_agent import ProgressAgent
+    from app.agents.nutrition_agent import NutritionAgent
 
     bot = Bot(token=settings.telegram_bot_token)
     progress = ProgressAgent()
+    nutrition = NutritionAgent()
     seven_days_ago = datetime.now(timezone.utc) - timedelta(days=7)
 
     async with AsyncSessionLocal() as session:
@@ -508,6 +510,33 @@ async def _async_weekly_report():
                     text=f"📊 *Weekly Report*\n\n{report}",
                     parse_mode="Markdown",
                 )
+
+                # Auto-adjust calorie target based on actual weight change this week
+                weight_logs = week_data["weight_logs"]
+                if len(weight_logs) >= 2:
+                    actual_change = weight_logs[-1]["weight_kg"] - weight_logs[0]["weight_kg"]
+                    # Expected: ~0.5 kg/week loss (500 kcal deficit × 7 days / 7700 kcal/kg)
+                    expected_change = -0.5
+                    try:
+                        new_target = await nutrition.adjust_calorie_target(
+                            user, actual_change, expected_change
+                        )
+                        if new_target and abs(new_target - (user.daily_calorie_target or 0)) >= 50:
+                            user.daily_calorie_target = new_target
+                            await session.commit()
+                            await bot.send_message(
+                                chat_id=user.id,
+                                text=(
+                                    f"🔄 *Calorie target updated to {new_target} kcal/day*\n\n"
+                                    f"Based on your weight change this week "
+                                    f"({actual_change:+.1f} kg vs expected −0.5 kg), "
+                                    f"I've adjusted your daily target to keep you on track."
+                                ),
+                                parse_mode="Markdown",
+                            )
+                    except Exception as e:
+                        logger.warning(f"Calorie adjustment failed for {user.id}: {e}")
+
                 await _mark_sent(session, user, "weekly_report", now_local)
                 logger.info(f"Weekly report sent to {user.id}")
             except Exception as e:

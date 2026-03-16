@@ -299,6 +299,52 @@ All times are in **your local timezone**. The default is `Asia/Kolkata` — chan
 
 ---
 
+## How Drax adapts over time
+
+Drax is not static — it learns from what you actually do and adjusts automatically. Here is exactly what gets recorded and how it feeds back into your plans:
+
+### Workout personalisation (session by session)
+
+Every time you complete a workout and log the weights you used, Drax stores that in the `exercise_logs` table. Before generating your next workout, it fetches the last 4 weeks of your exercise history and passes it to the AI coach. The coach then applies **progressive overload** — suggesting ~2.5–5% more weight or 1 extra rep compared to your last logged session.
+
+```
+You log: Bench Press — 60 kg × 3 sets × 8 reps
+Next session: AI suggests 62.5 kg × 3 sets × 8 reps
+```
+
+No weight logged = no progression (Drax can't guess). The 30-second weight log after each workout is what powers this.
+
+### Calorie target (week by week)
+
+Every Sunday (or your configured report day), Drax compares your **actual weight change** over the week against the **expected −0.5 kg/week** target:
+
+| Actual result | What Drax does |
+|---|---|
+| Lost less than expected (e.g., only −0.1 kg) | Reduces calorie target by ~50–150 kcal |
+| Lost more than expected (e.g., −1.0 kg) | Increases calorie target — loss rate too aggressive |
+| On track (approx. −0.5 kg) | No change |
+
+The adjustment only applies if the change is ≥50 kcal (avoids meaningless micro-adjustments). You receive a message explaining the change. The new target takes effect the next morning.
+
+### Weight progress (every log)
+
+Every `/weight` entry is stored with a timestamp. The progress dashboard calculates:
+- Total weight lost since start
+- Rate of change (kg/week trend)
+- A visual progress bar toward your goal weight
+- AI feedback comparing today's log to recent trend
+
+### What does NOT auto-adapt (yet)
+
+| Feature | Status |
+|---|---|
+| Macro split (protein/carb/fat %) | Static — set at onboarding; adjust manually if needed |
+| Workout volume (sets × reps) | Adapts via weight progression, not volume changes yet |
+| Rest day scheduling | Fixed to your gym schedule — change with `/notifications` |
+| Cuisine preference | Manual — use `/cuisine` to change |
+
+---
+
 ## Third-party data flows
 
 Three external services receive data when you use Drax:
