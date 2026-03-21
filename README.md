@@ -172,7 +172,7 @@ Everything else in `.env` has working defaults for local use.
 docker compose up
 ```
 
-This starts the bot, PostgreSQL, Redis, and Celery worker automatically.
+This starts the bot, PostgreSQL, and Redis. The asyncio scheduler runs inside the bot process automatically.
 
 **Without Docker:**
 
@@ -339,47 +339,88 @@ All times are in **your local timezone**. The default is `Asia/Kolkata` — chan
 
 ## How Drax adapts over time
 
-Drax is not static — it learns from what you actually do and adjusts automatically. Here is exactly what gets recorded and how it feeds back into your plans:
+Drax is not static — it learns from what you actually do across three timescales: **every message**, **every workout event**, and **every week**. This is how a real PT would operate: noticing your preferences, adjusting intensity based on consistency, and reviewing your full month every Sunday.
 
-### Workout personalisation (session by session)
+### Layer 1 — Every message: conversation memory
 
-Every time you complete a workout and log the weights you used, Drax stores that in the `exercise_logs` table. Before generating your next workout, it fetches the last 4 weeks of your exercise history and passes it to the AI coach. The coach then applies **progressive overload** — suggesting ~2.5–5% more weight or 1 extra rep compared to your last logged session.
+Whenever you send a message, Drax silently extracts preferences, dislikes, and constraints and stores them permanently in your profile:
+
+```
+"I hate burpees"          → remembered: dislikes burpees
+"I prefer evening training" → remembered: training timing preference
+"I'm lactose intolerant"   → remembered: dietary constraint
+```
+
+These memories are injected into every single LLM call — workouts, meal plans, motivational messages — so Drax never has to be told twice.
+
+### Layer 2 — Every workout event: incremental adaptation (EMA)
+
+Every time you tap **Done**, **Partial**, or **Skipped** after a workout, Drax immediately updates your coaching profile using an **Exponential Moving Average** (α = 0.15):
+
+```
+Completed → completion rate moves up
+Partial   → completion rate moves up slightly
+Skipped   → completion rate moves down; day added to skip pattern
+```
+
+The `intensity_recommendation` updates instantly:
+- ≥85% completion → **high** intensity
+- 65–84% → **moderate**
+- <65% → **low**
+
+This means if you skip Monday three times in a row, by Thursday's workout Drax already knows Monday is a problem day and will stop scheduling heavy sessions there — without waiting for Sunday.
+
+### Layer 3 — Every Sunday: full adaptation analysis
+
+Every Sunday, the **AdaptationAgent** does a deep 4-week retrospective. All arithmetic (averages, trends, percentages) is computed in Python — not by the LLM. The AI is only asked for qualitative coaching observations. The result is a permanent **adaptation profile** stored on your account, which includes:
+
+| What gets calculated | How it's used |
+|---|---|
+| Training phase (cutting / maintenance / recomp) | Shapes all macro and intensity decisions |
+| Mesocycle week (1→2→3→4→deload) | Week 4 = 50% volume, light weights, form focus |
+| Avg weekly weight change | Calorie target adjusted up/down if trend deviates |
+| 4-week calorie adherence % | Coach tone shifts; meal plans add more satiety foods |
+| 4-week protein adherence % | If critically low, every meal flagged as protein-dense |
+| Workout completion rate | Intensity recommendation (high / moderate / low) |
+| Skip patterns by day | Heavy sessions moved away from chronic skip days |
+| Chronic pain areas | Precise avoidance rules injected into every workout |
+| Recommended training split | PPL / Upper-Lower / Full Body — based on your actual schedule |
+| Coach observations | AI qualitative notes on your progress block |
+
+Every LLM call (workout, meal plan, motivation) receives this full profile so all decisions are shaped by real, accumulated evidence — not generic heuristics.
+
+### Layer 4 — Progressive overload (session by session)
+
+Every time you log weights after a workout, Drax stores that in `exercise_logs`. Before generating your next workout, it fetches the last 7 days of your history and applies progressive overload — suggesting ~2.5–5% more weight or 1 extra rep.
 
 ```
 You log: Bench Press — 60 kg × 3 sets × 8 reps
 Next session: AI suggests 62.5 kg × 3 sets × 8 reps
 ```
 
-No weight logged = no progression (Drax can't guess). The 30-second weight log after each workout is what powers this.
+No weight logged = no progression. The 30-second weight log after each workout is what powers this.
 
 ### Calorie target (week by week)
 
-Every Sunday (or your configured report day), Drax compares your **actual weight change** over the week against the **expected −0.5 kg/week** target:
+Every Sunday, Drax compares your actual weight change against the expected −0.5 kg/week target:
 
 | Actual result | What Drax does |
 |---|---|
-| Lost less than expected (e.g., only −0.1 kg) | Reduces calorie target by ~50–150 kcal |
-| Lost more than expected (e.g., −1.0 kg) | Increases calorie target — loss rate too aggressive |
-| On track (approx. −0.5 kg) | No change |
+| Lost less than expected | Reduces calorie target by ~50–150 kcal |
+| Lost more than expected | Increases calorie target — loss rate too aggressive |
+| On track | No change |
 
-The adjustment only applies if the change is ≥50 kcal (avoids meaningless micro-adjustments). You receive a message explaining the change. The new target takes effect the next morning.
-
-### Weight progress (every log)
-
-Every `/weight` entry is stored with a timestamp. The progress dashboard calculates:
-- Total weight lost since start
-- Rate of change (kg/week trend)
-- A visual progress bar toward your goal weight
-- AI feedback comparing today's log to recent trend
+The adjustment only applies if the change is ≥50 kcal (avoids meaningless micro-adjustments).
 
 ### What else adapts
 
 | Feature | How |
 |---|---|
 | **Macro targets** (protein/carbs/fat g) | Recalculated automatically whenever calorie target changes |
-| **Workout volume** (sets) | If same weight logged 3+ consecutive sessions (plateau), next workout suggests +1 set instead of +weight |
-| **Rest day scheduling** | If a gym day is skipped ≥2 weeks in a row, weekly report flags it and suggests rescheduling |
-| **Cuisine variety** | If same cuisine unchanged for ≥3 weeks, weekly report suggests a different one to try |
+| **Meal distribution** | Training day: carbs front-loaded, protein post-workout. Rest day: lower carbs, higher fat. Calculated in Python, not by the LLM. |
+| **Workout volume** (sets) | If plateau detected (same weight 3+ sessions), suggests +1 set instead of +weight |
+| **Injury avoidance** | Pain reports are parsed into structured data (body area, severity, pain type) and stored. Every future workout avoids those movement patterns precisely. |
+| **Cuisine variety** | If same cuisine unchanged for ≥3 weeks, weekly report suggests a different one |
 
 ---
 
@@ -434,12 +475,10 @@ Railway handles Docker, PostgreSQL, Redis, and SSL automatically.
    SECRET_KEY=any_long_random_string
    ```
 7. Railway builds and deploys. Your bot is live.
-8. Add Celery worker: `+ New Service` → same repo → start command:
-   `celery -A app.tasks.celery_app worker --loglevel=info`
-9. Add Celery beat (scheduler): `+ New Service` → same repo → start command:
-   `celery -A app.tasks.celery_app beat --loglevel=info`
 
-Every `git push` to main auto-deploys all three services.
+> **No separate Celery services needed.** Scheduled notifications (morning plan, water reminders, evening check-in, weekly report) run inside the main process using an asyncio scheduler. A single Railway service is enough.
+
+Every `git push` to main triggers an automatic redeploy.
 
 ### VPS (Hetzner / DigitalOcean) — $3–5/month, full control
 
@@ -476,8 +515,9 @@ LangGraph (supervisor + agent nodes)
       ▼
 PostgreSQL (all user data + logs)
 
-Celery + Redis (scheduled notifications)
-  └── Runs every 30 min → checks your configured time in your timezone
+In-process asyncio scheduler (scheduled notifications)
+  └── Runs every 30 min inside the same process → checks your configured time in your timezone
+  └── No separate Celery worker or beat needed — works on single-service Railway deployments
 ```
 
 ### What actually calls the LLM (cost transparency)
@@ -486,15 +526,20 @@ Celery + Redis (scheduled notifications)
 |---|---|---|---|
 | Meal text parsing | ✅ | Fast (Haiku/mini) | Understands natural language food |
 | Meal feedback | ✅ | Fast | 2–3 sentence response |
-| Workout generation | ✅ | Main (Sonnet/4o) | Cached daily — only once per day |
+| Workout generation | ✅ | Main (Sonnet/4o) | Redis-cached 24h — only generates once per day |
 | Weekly report | ✅ | Main | Deep analysis |
 | Pain assessment | ✅ | Main | Safety-critical |
+| Structured pain extraction | ✅ | Fast | Parses body area, severity, pain type from free text |
 | Weight feedback | ✅ | Fast | Short personalised response |
 | Morning motivation | ✅ | Fast | Quick pump-up |
 | Intent classification | ✅ | Fast | Only for ambiguous inputs |
+| Preference extraction | ✅ | Fast | Background fire-and-forget after every message |
+| Weekly adaptation coaching | ✅ | Fast | Coach observations + recommended split (qualitative only) |
 | Hydration tips/status | ❌ | None | Rule-based math + templates |
 | Rest day message | ❌ | None | 4 pre-written rotations |
 | Progress bar | ❌ | None | Pure calculation |
+| Macro targets per meal | ❌ | None | Pre-computed in Python; LLM just selects foods |
+| EMA adaptation update | ❌ | None | Pure math on workout completion events |
 | Water amount parsing | ❌ | None | Regex: "500ml", "2 glasses" → ml |
 | Height/weight parsing | ❌ | None | Regex: "5'10\"", "187 lbs" → cm/kg |
 
@@ -518,9 +563,10 @@ Celery + Redis (scheduled notifications)
 drax/
 ├── app/
 │   ├── agents/              # AI coaching agents
-│   │   ├── base_agent.py    # Shared: user context, language support
-│   │   ├── nutrition_agent.py
-│   │   ├── fitness_coach.py
+│   │   ├── base_agent.py    # Shared: user context, adaptation profile, chat memory
+│   │   ├── fitness_coach.py # Workout generation (Redis-cached, progressive overload)
+│   │   ├── nutrition_agent.py # Meal parsing, meal plans (Python macro targets)
+│   │   ├── adaptation_agent.py # Weekly 4-week retrospective; updates coaching profile
 │   │   ├── hydration_agent.py
 │   │   ├── motivation_agent.py
 │   │   ├── progress_agent.py
@@ -534,9 +580,9 @@ drax/
 │   │   ├── handlers/        # Telegram command + message handlers
 │   │   ├── keyboards.py     # All inline keyboards
 │   │   └── bot.py           # Handler registration + routing
-│   ├── models/              # SQLAlchemy models (User, MealLog, etc.)
+│   ├── models/              # SQLAlchemy models (User, MealLog, WorkoutLog, ExerciseLog, etc.)
 │   ├── services/            # LLM, Nutritionix, YouTube API clients
-│   ├── tasks/               # Celery scheduled tasks
+│   ├── tasks/               # Scheduled tasks (in-process asyncio scheduler)
 │   ├── api/                 # FastAPI health sync endpoint
 │   ├── config.py            # Pydantic settings (from .env)
 │   ├── database.py          # Async SQLAlchemy engine

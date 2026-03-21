@@ -63,34 +63,18 @@ NUTRITIONIX_API_KEY=your_key
 YOUTUBE_API_KEY=your_key
 ```
 
-**7. Add Celery worker** (handles the 5 AM messages and reminders)
-- Click **+ New** → **GitHub Repo** → same repo
-- Under **Settings** → **Deploy** → set **Custom Start Command**:
-  ```
-  celery -A app.tasks.celery_app worker --loglevel=info --concurrency=2
-  ```
-- Add the same environment variables
+**7. Done.** Your bot is live. Every `git push` to main triggers an automatic redeploy.
 
-**8. Add Celery beat** (the clock that triggers scheduled tasks)
-- Click **+ New** → **GitHub Repo** → same repo
-- Set **Custom Start Command**:
-  ```
-  celery -A app.tasks.celery_app beat --loglevel=info
-  ```
-- Add the same environment variables
-
-**9. Done.** Your bot is live. Every `git push` to main triggers an automatic redeploy.
+> **No separate Celery services needed.** The asyncio scheduler runs inside the main process and handles all scheduled notifications (morning plan, water reminders, evening check-in, weekly report). A single Railway service is all you need.
 
 ### Railway costs
 
 | What | Free credit |
 |---|---|
-| Web service | ~$0.50–1/month |
-| Celery worker | ~$0.50–1/month |
-| Celery beat | ~$0.20/month |
+| Web service (includes scheduler) | ~$0.50–1/month |
 | PostgreSQL (1GB) | ~$1/month |
 | Redis | ~$0.50/month |
-| **Total** | **~$3–4/month** (within $5 free credit) |
+| **Total** | **~$2–2.50/month** (well within $5 free credit) |
 
 ---
 
@@ -154,7 +138,7 @@ TELEGRAM_WEBHOOK_URL=
 docker compose up -d
 ```
 
-This starts 5 services: db, redis, web, celery_worker, celery_beat.
+This starts 3 services: db, redis, web. The asyncio scheduler runs inside the web service — no separate Celery containers needed.
 
 **8. SSL with Nginx (only needed if using webhook)**
 ```bash
@@ -278,8 +262,8 @@ docker compose logs -f web
 docker compose logs -f celery_worker
 ```
 
-If Celery tasks aren't running (no 5 AM messages), check:
+If scheduled notifications aren't firing (no 5 AM messages), check the web service logs — the asyncio scheduler runs inside the main process:
 ```bash
-docker compose logs celery_beat
-docker compose logs celery_worker
+docker compose logs -f web
 ```
+Look for lines like `[scheduler] morning_plan sent to user ...` or `[scheduler] next run in Xs`.
