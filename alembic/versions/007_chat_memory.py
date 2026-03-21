@@ -5,7 +5,6 @@ Revises: 006
 Create Date: 2026-03-21
 """
 from alembic import op
-import sqlalchemy as sa
 
 revision = '007'
 down_revision = '006'
@@ -14,8 +13,8 @@ depends_on = None
 
 
 def upgrade():
-    op.add_column('users', sa.Column('chat_memory', sa.JSON(), nullable=True))
+    op.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS chat_memory JSON")
 
 
 def downgrade():
-    op.drop_column('users', 'chat_memory')
+    op.execute("ALTER TABLE users DROP COLUMN IF EXISTS chat_memory")

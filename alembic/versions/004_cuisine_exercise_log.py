@@ -5,7 +5,6 @@ Revises: 003
 Create Date: 2026-03-16
 """
 from alembic import op
-import sqlalchemy as sa
 
 revision = '004'
 down_revision = '003'
@@ -14,27 +13,26 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # cuisine_preference on users — nullable, user sets it via /cuisine
-    op.add_column('users', sa.Column('cuisine_preference', sa.String(50), nullable=True))
+    op.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS cuisine_preference VARCHAR(50)")
 
-    # exercise_logs — records per-exercise performance for progressive overload
-    op.create_table(
-        'exercise_logs',
-        sa.Column('id', sa.Integer(), primary_key=True, autoincrement=True),
-        sa.Column('user_id', sa.BigInteger(), sa.ForeignKey('users.id'), nullable=False, index=True),
-        sa.Column('workout_log_id', sa.Integer(), sa.ForeignKey('workout_logs.id'), nullable=True),
-        sa.Column('exercise_name', sa.String(100), nullable=False),
-        sa.Column('weight_kg', sa.Float(), nullable=True),
-        sa.Column('reps', sa.Integer(), nullable=True),
-        sa.Column('sets', sa.Integer(), nullable=True),
-        sa.Column('rpe', sa.Float(), nullable=True),
-        sa.Column('logged_at', sa.DateTime(timezone=True), server_default=sa.func.now()),
-    )
-    op.create_index('ix_exercise_logs_user_id', 'exercise_logs', ['user_id'])
-    op.create_index('ix_exercise_logs_logged_at', 'exercise_logs', ['logged_at'])
-    op.create_index('ix_exercise_logs_workout_log_id', 'exercise_logs', ['workout_log_id'])
+    op.execute("""
+        CREATE TABLE IF NOT EXISTS exercise_logs (
+            id          SERIAL PRIMARY KEY,
+            user_id     BIGINT NOT NULL REFERENCES users(id),
+            workout_log_id INTEGER REFERENCES workout_logs(id),
+            exercise_name VARCHAR(100) NOT NULL,
+            weight_kg   FLOAT,
+            reps        INTEGER,
+            sets        INTEGER,
+            rpe         FLOAT,
+            logged_at   TIMESTAMPTZ DEFAULT now()
+        )
+    """)
+    op.execute("CREATE INDEX IF NOT EXISTS ix_exercise_logs_user_id ON exercise_logs (user_id)")
+    op.execute("CREATE INDEX IF NOT EXISTS ix_exercise_logs_logged_at ON exercise_logs (logged_at)")
+    op.execute("CREATE INDEX IF NOT EXISTS ix_exercise_logs_workout_log_id ON exercise_logs (workout_log_id)")
 
 
 def downgrade() -> None:
-    op.drop_table('exercise_logs')
-    op.drop_column('users', 'cuisine_preference')
+    op.execute("DROP TABLE IF EXISTS exercise_logs")
+    op.execute("ALTER TABLE users DROP COLUMN IF EXISTS cuisine_preference")

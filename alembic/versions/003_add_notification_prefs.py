@@ -5,8 +5,6 @@ Revises: 002
 Create Date: 2026-03-16
 """
 from alembic import op
-import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import JSON
 
 revision = "003"
 down_revision = "002"
@@ -15,10 +13,10 @@ depends_on = None
 
 
 def upgrade():
-    op.add_column("users", sa.Column("notification_prefs", JSON, nullable=True))
-    op.add_column("users", sa.Column("notifications_last_sent", JSON, nullable=True))
+    op.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS notification_prefs JSON")
+    op.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS notifications_last_sent JSON")
 
 
 def downgrade():
-    op.drop_column("users", "notifications_last_sent")
-    op.drop_column("users", "notification_prefs")
+    op.execute("ALTER TABLE users DROP COLUMN IF EXISTS notifications_last_sent")
+    op.execute("ALTER TABLE users DROP COLUMN IF EXISTS notification_prefs")

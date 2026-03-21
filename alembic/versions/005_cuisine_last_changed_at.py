@@ -5,7 +5,6 @@ Revises: 004
 Create Date: 2026-03-16
 """
 from alembic import op
-import sqlalchemy as sa
 
 revision = '005'
 down_revision = '004'
@@ -14,11 +13,8 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column(
-        'users',
-        sa.Column('cuisine_last_changed_at', sa.DateTime(timezone=True), nullable=True),
-    )
+    op.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS cuisine_last_changed_at TIMESTAMPTZ")
 
 
 def downgrade() -> None:
-    op.drop_column('users', 'cuisine_last_changed_at')
+    op.execute("ALTER TABLE users DROP COLUMN IF EXISTS cuisine_last_changed_at")
