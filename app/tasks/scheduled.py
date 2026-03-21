@@ -477,11 +477,14 @@ async def _async_weekly_report():
     from app.models.workout_log import WorkoutLog
     from app.agents.progress_agent import ProgressAgent
     from app.agents.nutrition_agent import NutritionAgent
+    from app.agents.adaptation_agent import AdaptationAgent
 
     bot = Bot(token=settings.telegram_bot_token)
     progress = ProgressAgent()
     nutrition = NutritionAgent()
+    adaptation = AdaptationAgent()
     seven_days_ago = datetime.now(timezone.utc) - timedelta(days=7)
+    four_weeks_ago = datetime.now(timezone.utc) - timedelta(weeks=4)
 
     async with AsyncSessionLocal() as session:
         result = await session.execute(
@@ -620,6 +623,90 @@ async def _async_weekly_report():
                             )
                         except Exception as e:
                             logger.warning(f"Cuisine rotation suggestion failed for {user.id}: {e}")
+
+                # ── Adaptation analysis (runs every week after the report) ──
+                # Fetch 4 weeks of data and update the user's adaptation_profile.
+                # This profile is injected into every future LLM call so all
+                # workout/meal/motivation decisions are shaped by real history.
+                try:
+                    weights_4w = (await session.execute(
+                        select(WeightLog)
+                        .where(WeightLog.user_id == user.id)
+                        .where(WeightLog.logged_at >= four_weeks_ago)
+                        .order_by(WeightLog.logged_at)
+                    )).scalars().all()
+
+                    meals_4w = (await session.execute(
+                        select(MealLog)
+                        .where(MealLog.user_id == user.id)
+                        .where(MealLog.logged_at >= four_weeks_ago)
+                    )).scalars().all()
+
+                    workouts_4w = (await session.execute(
+                        select(WorkoutLog)
+                        .where(WorkoutLog.user_id == user.id)
+                        .where(WorkoutLog.created_at >= four_weeks_ago)
+                        .order_by(WorkoutLog.created_at)
+                    )).scalars().all()
+
+                    four_week_data = {
+                        "weight_logs": [
+                            {"weight_kg": w.weight_kg, "logged_at": str(w.logged_at)}
+                            for w in weights_4w
+                        ],
+                        "meal_logs": [
+                            {"calories": m.calories, "protein_g": m.protein_g, "logged_at": str(m.logged_at)}
+                            for m in meals_4w
+                        ],
+                        "workout_logs": [
+                            {
+                                "completed": bool(wl.completed),
+                                "skipped": wl.completion_notes == "Skipped",
+                                "day_of_week": wl.created_at.strftime("%A") if wl.created_at else "",
+                                "workout_type": wl.workout_type or "unknown",
+                                "pain_description": wl.pain_description,
+                                "muscle_groups": list({
+                                    ex.get("muscle_group", "").lower()
+                                    for ex in (wl.exercises or [])
+                                    if ex.get("muscle_group")
+                                }),
+                            }
+                            for wl in workouts_4w
+                        ],
+                    }
+
+                    new_profile = await adaptation.analyze_and_update(user, four_week_data)
+
+                    # Refresh the user row inside this session before updating
+                    db_user = (await session.execute(
+                        select(User).where(User.id == user.id)
+                    )).scalar_one()
+                    db_user.adaptation_profile = new_profile
+                    await session.commit()
+
+                    # Let the user know Drax has updated its understanding of them
+                    meso_week = new_profile.get("mesocycle_week", 1)
+                    phase = new_profile.get("training_phase", "cutting")
+                    observations = new_profile.get("coach_observations", "")
+                    focus = new_profile.get("key_focus_areas", [])
+                    focus_str = " | ".join(focus) if focus else ""
+                    deload_note = "\n\n🔄 *This week is your DELOAD week* — lighter weights, lower volume, full recovery." if meso_week == 4 else ""
+
+                    adaptation_msg = (
+                        f"🧠 *Drax has updated your coaching profile*\n\n"
+                        f"📊 Training phase: *{phase.capitalize()}*\n"
+                        f"🔁 Mesocycle week: *{meso_week}/4*{deload_note}\n\n"
+                        f"💬 _{observations}_\n\n"
+                        + (f"🎯 *This week's focus:* {focus_str}" if focus_str else "")
+                    )
+                    await bot.send_message(
+                        chat_id=user.id,
+                        text=adaptation_msg.strip(),
+                        parse_mode="Markdown",
+                    )
+                    logger.info(f"Adaptation profile updated for {user.id}")
+                except Exception as e:
+                    logger.warning(f"Adaptation analysis failed for {user.id}: {e}")
 
                 await _mark_sent(session, user, "weekly_report", now_local)
                 logger.info(f"Weekly report sent to {user.id}")

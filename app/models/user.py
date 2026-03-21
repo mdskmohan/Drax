@@ -114,6 +114,13 @@ class User(Base):
     # Apple Health / Google Health Connect sync
     health_sync_token = Column(String(64), nullable=True, unique=True)
 
+    # Long-term adaptation profile — updated weekly by AdaptationAgent.
+    # Contains everything Drax has learned about this specific user:
+    # training phase, mesocycle week, skip patterns, chronic pain areas,
+    # adherence metrics, coach observations, recommended split, etc.
+    # Injected into every LLM call so all decisions are shaped by real history.
+    adaptation_profile = Column(JSON, nullable=True)
+
     # Per-user notification schedule preferences
     # Structure mirrors DEFAULT_NOTIFICATION_PREFS — only overrides need to be stored
     notification_prefs = Column(JSON, nullable=True)

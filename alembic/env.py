@@ -7,7 +7,7 @@ from alembic import context
 
 # Import your models so Alembic can detect them
 from app.database import Base
-from app.models import user, meal_log, water_log, workout_log, weight_log, progress_report  # noqa
+from app.models import user, meal_log, water_log, workout_log, weight_log, progress_report, exercise_log  # noqa
 
 config = context.config
 if config.config_file_name is not None:
