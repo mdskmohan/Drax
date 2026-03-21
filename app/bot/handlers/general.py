@@ -105,8 +105,16 @@ async def unknown_message_handler(update: Update, context: ContextTypes.DEFAULT_
     if len(response) > 4000:
         response = response[:4000] + "..."
 
+    # Only show the full menu after action completions (meal/water/weight logged,
+    # progress/plan/workout shown). For conversational replies, no keyboard — it
+    # clutters every chat message and makes the bot feel like a form.
+    intent = result.get("intent", "general")
+    action_intents = {"log_meal", "log_water", "log_weight", "get_progress",
+                      "get_plan", "get_workout", "get_motivation"}
+    reply_markup = main_menu_keyboard() if intent in action_intents else None
+
     await msg.edit_text(response, parse_mode="Markdown",
-                        reply_markup=main_menu_keyboard(),
+                        reply_markup=reply_markup,
                         disable_web_page_preview=True)
 
 
