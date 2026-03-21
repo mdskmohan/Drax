@@ -26,7 +26,17 @@ async def main():
         await app.start()
         logger.info("Drax is running! Send /start to your bot on Telegram.")
         await app.updater.start_polling(drop_pending_updates=True)
-        await app.updater.idle()
+
+        # Start in-process scheduler so notifications fire without Celery
+        from app.tasks.scheduled import async_scheduler_loop
+        scheduler_task = asyncio.create_task(async_scheduler_loop())
+        logger.info("In-process notification scheduler started")
+
+        try:
+            await app.updater.idle()
+        finally:
+            scheduler_task.cancel()
+
         await app.stop()
 
 

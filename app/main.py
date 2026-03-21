@@ -2,6 +2,7 @@
 Drax — FastAPI Application Entry Point.
 Handles webhook registration, database init, and Telegram bot lifecycle.
 """
+import asyncio
 import logging
 import structlog
 from contextlib import asynccontextmanager
@@ -44,10 +45,16 @@ async def lifespan(app: FastAPI):
     else:
         logger.warning("No TELEGRAM_WEBHOOK_URL set — run in polling mode instead")
 
+    # Start in-process scheduler (handles notifications without Celery)
+    from app.tasks.scheduled import async_scheduler_loop
+    scheduler_task = asyncio.create_task(async_scheduler_loop())
+    logger.info("In-process notification scheduler started")
+
     logger.info("Drax is live! 💪")
     yield
 
     # Shutdown
+    scheduler_task.cancel()
     logger.info("Shutting down Drax...")
     await application.stop()
     await application.shutdown()

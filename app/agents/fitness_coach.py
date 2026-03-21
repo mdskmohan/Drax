@@ -144,7 +144,7 @@ Return JSON with this exact structure:
         ]
 
         plan = await llm.json(
-            messages, system=self._system_str(COACH_ROLE, user), max_tokens=2048
+            messages, system=self._system_str(COACH_ROLE, user), max_tokens=4096
         )
 
         exercise_names = [e.get("exercise", "") for e in plan.get("main_workout", [])]

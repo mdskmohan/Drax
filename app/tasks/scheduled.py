@@ -610,6 +610,41 @@ async def _async_weekly_report():
                 logger.error(f"Weekly report failed for {user.id}: {e}")
 
 
+# ── In-process async scheduler (no Celery required) ───────────────────────────
+
+async def async_scheduler_loop():
+    """
+    Run all notification tasks every 30 minutes, aligned to :00/:30 clock boundaries.
+    Use this instead of Celery when deploying without a separate worker process
+    (e.g. Railway single-service, local polling mode).
+    """
+    import asyncio
+
+    logger.info("In-process scheduler started (runs every 30 min at :00/:30)")
+
+    # Fire once immediately on startup so the first check happens now,
+    # then align subsequent runs to :00/:30 boundaries.
+    while True:
+        now = datetime.now(timezone.utc)
+        seconds_into_slot = (now.minute % 30) * 60 + now.second
+        sleep_secs = 30 * 60 - seconds_into_slot
+        logger.info(f"Scheduler sleeping {sleep_secs}s until next :00/:30 boundary")
+        await asyncio.sleep(sleep_secs)
+
+        logger.info("Scheduler tick — running notification tasks")
+        for name, coro_fn in [
+            ("morning_plan", _async_send_morning_plan),
+            ("pre_workout", _async_pre_workout_motivation),
+            ("evening_checkin", _async_evening_checkin),
+            ("water_reminder", _async_water_reminder),
+            ("weekly_report", _async_weekly_report),
+        ]:
+            try:
+                await coro_fn()
+            except Exception as exc:
+                logger.error(f"Scheduler task '{name}' failed: {exc}")
+
+
 # ── Gym-day helper ─────────────────────────────────────────────────────────────
 
 def _is_gym_day(user, now_local: datetime | None = None) -> bool:
