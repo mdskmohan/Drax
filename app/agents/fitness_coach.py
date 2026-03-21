@@ -1,6 +1,10 @@
 """
-Fitness Coach Agent — Claude Sonnet for workout generation, with daily caching.
+Fitness Coach Agent — workout generation with Redis-backed daily cache.
+
+Cache key: workout:{user_id}:{date}:{day_of_week}  TTL: 24 h
+Falls back gracefully to no caching if Redis is unavailable.
 """
+import json
 from collections import defaultdict
 from datetime import date
 from app.agents.base_agent import BaseAgent
@@ -8,8 +12,30 @@ from app.models.user import User
 from app.services.llm import llm
 from app.services.youtube import get_workout_videos
 
-# Simple in-process daily cache: {(user_id, date, day_of_week) -> plan}
-_workout_cache: dict = {}
+
+async def _cache_get(key: str) -> dict | None:
+    """Return cached plan from Redis, or None if missing / Redis down."""
+    try:
+        from redis.asyncio import Redis
+        from app.config import settings
+        r = Redis.from_url(settings.redis_url, decode_responses=True)
+        raw = await r.get(key)
+        await r.aclose()
+        return json.loads(raw) if raw else None
+    except Exception:
+        return None
+
+
+async def _cache_set(key: str, plan: dict) -> None:
+    """Write plan to Redis with 24-hour TTL. Silently skips if Redis down."""
+    try:
+        from redis.asyncio import Redis
+        from app.config import settings
+        r = Redis.from_url(settings.redis_url, decode_responses=True)
+        await r.setex(key, 86400, json.dumps(plan))
+        await r.aclose()
+    except Exception:
+        pass
 
 
 COACH_ROLE = """You are an expert personal fitness trainer and certified strength & conditioning coach.
@@ -58,10 +84,11 @@ class FitnessCoachAgent(BaseAgent):
         yesterday_nutrition: dict | None = None,
         recent_workout_history: list[dict] | None = None,
     ) -> dict:
-        # Return cached plan if already generated today
-        cache_key = (user.id, date.today(), day_of_week)
-        if cache_key in _workout_cache:
-            return _workout_cache[cache_key]
+        # Return cached plan if already generated today (Redis, shared across workers)
+        cache_key = f"workout:{user.id}:{date.today().isoformat()}:{day_of_week}"
+        cached = await _cache_get(cache_key)
+        if cached:
+            return cached
 
         recent_summary = f"\nRecent workouts: {recent_workouts}" if recent_workouts else ""
 
@@ -216,7 +243,7 @@ Return JSON with this exact structure:
         exercise_names = [e.get("exercise", "") for e in plan.get("main_workout", [])]
         plan["youtube_links"] = await get_workout_videos(exercise_names[:5])
 
-        _workout_cache[cache_key] = plan
+        await _cache_set(cache_key, plan)
         return plan
 
     def generate_rest_day_message(self, user: User) -> str:

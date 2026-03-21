@@ -73,10 +73,23 @@ class BaseAgent:
                     "do NOT programme heavy sessions on these days; place rest or light work here"
                 )
 
-            pain = profile.get("chronic_pain_areas", [])
-            if pain:
+            # Prefer structured pain data (precise avoidance rules) over raw text
+            structured_pain = profile.get("chronic_pain_structured", [])
+            raw_pain = profile.get("chronic_pain_areas", [])
+            if structured_pain:
+                lines.append("CHRONIC PAIN/INJURY HISTORY (avoid stressing these areas):")
+                for p in structured_pain[-5:]:
+                    area = p.get("body_area", "unknown")
+                    sev = p.get("severity", "?")
+                    ptype = p.get("pain_type", "pain")
+                    date_str = p.get("reported_at", "")
+                    lines.append(
+                        f"  - {area.title()}: severity {sev}/10 {ptype} ({date_str}) "
+                        f"— AVOID exercises that load {area} directly"
+                    )
+            elif raw_pain:
                 lines.append(
-                    f"CHRONIC PAIN/INJURY HISTORY: {'; '.join(pain[-3:])} — "
+                    f"CHRONIC PAIN/INJURY HISTORY: {'; '.join(raw_pain[-3:])} — "
                     "avoid exercises that directly stress these areas"
                 )
 
@@ -91,6 +104,18 @@ class BaseAgent:
                 lines.append(f"Coach observations: {profile['coach_observations']}")
 
             lines.append("=== END ADAPTATION PROFILE ===")
+
+        # ── Conversation memory ──────────────────────────────────────────────
+        # Preferences, dislikes, and constraints the user has expressed in chat.
+        # Extracted automatically from every message and remembered permanently.
+        memory = getattr(user, "chat_memory", None) or []
+        if memory:
+            lines += ["", "USER PREFERENCES (remembered from past conversations):"]
+            for m in memory[-20:]:
+                lines.append(f"  - {m['key'].replace('_', ' ')}: {m['value']}")
+            lines.append(
+                "IMPORTANT: honour all preferences above in every recommendation."
+            )
 
         return "\n".join(lines)
 

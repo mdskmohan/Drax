@@ -444,6 +444,7 @@ async def report_pain_node(state: DraxState) -> dict:
 # ── Node: General fallback ────────────────────────────────────────────────────
 
 async def general_node(state: DraxState) -> dict:
+    import asyncio
     from app.services.llm import llm
     user = state["user"]
     user_input = state.get("user_input", "")
@@ -475,7 +476,74 @@ async def general_node(state: DraxState) -> dict:
         system=system,
         max_tokens=800,
     )
+
+    # Fire-and-forget: extract any persistent preferences from this message
+    # so Drax remembers them in every future session without blocking the reply.
+    if user:
+        asyncio.create_task(_extract_and_store_preferences(user.id, user_input))
+
     return {"response": response, "chain_to": ""}
+
+
+async def _extract_and_store_preferences(user_id: int, user_input: str) -> None:
+    """
+    Run a fast LLM call to detect any persistent fitness preferences, dislikes,
+    or self-reported physical constraints in the message. Store them in
+    user.chat_memory so they are injected into every future LLM call.
+    """
+    from app.services.llm import llm
+    from app.models.user import User
+
+    try:
+        result = await llm.json(
+            messages=[{"role": "user", "content": user_input}],
+            system=(
+                "Extract ONLY persistent, actionable fitness or nutrition preferences "
+                "worth remembering long-term from this message.\n"
+                "Extract: dislikes (exercises, foods), preferences (timing, style), "
+                "self-reported physical limitations (weak joints, old injuries).\n"
+                "Do NOT extract: questions, temporary states, generic statements, "
+                "or things already standard in a profile (name, weight, etc.).\n"
+                "Examples worth extracting:\n"
+                '  "I hate burpees" → {"key": "dislikes_burpees", "value": "hates burpees"}\n'
+                '  "my left shoulder is dodgy" → {"key": "weak_left_shoulder", "value": "reports weak/injured left shoulder"}\n'
+                '  "I prefer training at night" → {"key": "training_timing", "value": "prefers evening training"}\n'
+                'Return JSON: {"preferences": [{"key": "snake_case_key", "value": "..."}]}\n'
+                'Return {"preferences": []} if nothing worth storing.'
+            ),
+            fast=True,
+            max_tokens=150,
+        )
+        prefs = result.get("preferences", [])
+        if not prefs:
+            return
+
+        async with AsyncSessionLocal() as session:
+            q = await session.execute(select(User).where(User.id == user_id))
+            user = q.scalar_one_or_none()
+            if not user:
+                return
+
+            memory = list(user.chat_memory or [])
+            existing = {m["key"]: i for i, m in enumerate(memory)}
+            now = datetime.now(timezone.utc).isoformat()
+
+            for pref in prefs:
+                key = (pref.get("key") or "").strip()
+                value = (pref.get("value") or "").strip()
+                if not key or not value:
+                    continue
+                if key in existing:
+                    memory[existing[key]]["value"] = value
+                    memory[existing[key]]["noted_at"] = now
+                else:
+                    memory.append({"key": key, "value": value, "noted_at": now})
+                    existing[key] = len(memory) - 1
+
+            user.chat_memory = memory[-25:]   # cap at 25 entries
+            await session.commit()
+    except Exception:
+        pass  # never let this crash the main response flow
 
 
 # ── Node: Chain router ────────────────────────────────────────────────────────

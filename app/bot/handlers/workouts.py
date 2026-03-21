@@ -97,6 +97,48 @@ async def show_todays_workout(update: Update, context: ContextTypes.DEFAULT_TYPE
         )
 
 
+async def _update_adaptation_incrementally(user_id: int, event: str, day_of_week: str) -> None:
+    """
+    Incrementally update adaptation_profile on every workout event using an
+    Exponential Moving Average (α=0.15) — no need to wait until Sunday's batch.
+
+    event: 'completed' | 'partial' | 'skipped'
+    """
+    try:
+        async with AsyncSessionLocal() as session:
+            result = await session.execute(select(User).where(User.id == user_id))
+            user = result.scalar_one_or_none()
+            if not user:
+                return
+
+            profile = dict(user.adaptation_profile or {})
+
+            # EMA on completion rate: new = 0.85 * old + 0.15 * outcome
+            current_rate = profile.get("avg_workout_completion_rate", 0.75)
+            outcome = 1.0 if event in ("completed", "partial") else 0.0
+            profile["avg_workout_completion_rate"] = round(
+                0.85 * current_rate + 0.15 * outcome, 3
+            )
+
+            # Intensity recommendation follows completion rate
+            rate = profile["avg_workout_completion_rate"]
+            profile["intensity_recommendation"] = (
+                "high" if rate >= 0.85 else "moderate" if rate >= 0.65 else "low"
+            )
+
+            # Increment skip counter for this day (fractional to reduce noise;
+            # weekly batch does the authoritative full-integer count)
+            if event == "skipped":
+                skips = dict(profile.get("skip_patterns", {}))
+                skips[day_of_week] = round(skips.get(day_of_week, 0) + 0.5, 1)
+                profile["skip_patterns"] = skips
+
+            user.adaptation_profile = profile
+            await session.commit()
+    except Exception:
+        pass  # never block the main completion flow
+
+
 async def workout_completion_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle workout completion/skip/pain callbacks."""
     query = update.callback_query
@@ -122,6 +164,11 @@ async def workout_completion_callback(update: Update, context: ContextTypes.DEFA
                 workout_log.completed = True
                 workout_log.completed_at = datetime.now(timezone.utc)
             await session.commit()
+
+            import asyncio
+            asyncio.create_task(
+                _update_adaptation_incrementally(user_id, "completed", datetime.now().strftime("%A"))
+            )
 
             # Store the main exercises for the weight-logging flow
             exercises = []
@@ -151,6 +198,11 @@ async def workout_completion_callback(update: Update, context: ContextTypes.DEFA
                 workout_log.completed_at = datetime.now(timezone.utc)
             await session.commit()
 
+            import asyncio
+            asyncio.create_task(
+                _update_adaptation_incrementally(user_id, "partial", datetime.now().strftime("%A"))
+            )
+
             await query.edit_message_text(
                 "💪 *Partial workout logged!*\n\n"
                 "Something is ALWAYS better than nothing. "
@@ -165,6 +217,11 @@ async def workout_completion_callback(update: Update, context: ContextTypes.DEFA
                 workout_log.completed = False
                 workout_log.completion_notes = "Skipped"
             await session.commit()
+
+            import asyncio
+            asyncio.create_task(
+                _update_adaptation_incrementally(user_id, "skipped", datetime.now().strftime("%A"))
+            )
 
             await query.edit_message_text(
                 "😤 *Workout skipped — noted.*\n\n"
@@ -376,6 +433,43 @@ async def process_pain_report(update: Update, context: ContextTypes.DEFAULT_TYPE
             if workout_log:
                 workout_log.pain_description = text
         await session.commit()
+
+        # Extract structured pain data and store in adaptation_profile
+        # so the AI gets precise avoidance rules ("avoid knee flexion under load")
+        # rather than having to infer from raw text.
+        if user:
+            try:
+                from app.services.llm import llm as _llm
+                pain_structured = await _llm.json(
+                    messages=[{"role": "user", "content": text}],
+                    system=(
+                        "Extract pain details from this description. "
+                        'Return JSON: {"body_area": "e.g. lower back, right knee, left shoulder", '
+                        '"severity": <1-10>, '
+                        '"pain_type": "sharp|dull|soreness|stiffness|ache"}'
+                    ),
+                    fast=True,
+                    max_tokens=80,
+                )
+                body_area = pain_structured.get("body_area", "").strip()
+                severity = pain_structured.get("severity", 5)
+                pain_type = pain_structured.get("pain_type", "soreness")
+
+                if body_area:
+                    profile = dict(user.adaptation_profile or {})
+                    structured_list = list(profile.get("chronic_pain_structured", []))
+                    structured_list.append({
+                        "body_area": body_area,
+                        "severity": int(severity),
+                        "pain_type": pain_type,
+                        "raw": text[:120],
+                        "reported_at": datetime.now(timezone.utc).isoformat()[:10],
+                    })
+                    profile["chronic_pain_structured"] = structured_list[-10:]
+                    user.adaptation_profile = profile
+                    await session.commit()
+            except Exception:
+                pass  # never block the main pain assessment flow
 
         # Get pain assessment
         assessment = await recovery.assess_pain(user, text)

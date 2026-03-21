@@ -144,10 +144,41 @@ Give 2-3 sentences of helpful feedback on the meal quality and remaining calorie
                     "\n→ Hydration was very poor yesterday. Include a hydration reminder in nutrition_tip."
                 )
 
+        # ── Pre-compute exact macro targets per meal in Python ────────────────
+        # Never ask the LLM to do arithmetic. Give it exact numbers as hard
+        # constraints; its job is to choose foods that hit them, not calculate.
+        is_training = bool(today_workout and today_workout.get("is_gym_day"))
+
+        if is_training:
+            # Training day: front-load carbs pre-workout, protein-heavy post-workout
+            cal_dist  = {"breakfast": 0.22, "lunch": 0.35, "dinner": 0.30, "snacks": 0.13}
+            prot_dist = {"breakfast": 0.20, "lunch": 0.38, "dinner": 0.30, "snacks": 0.12}
+        else:
+            # Rest day: even distribution, slightly lower carbs
+            cal_dist  = {"breakfast": 0.25, "lunch": 0.35, "dinner": 0.28, "snacks": 0.12}
+            prot_dist = {"breakfast": 0.25, "lunch": 0.30, "dinner": 0.30, "snacks": 0.15}
+
+        meal_targets = {
+            meal: {
+                "calories": round(calorie_target * cal_dist[meal]),
+                "protein_g": round(prot_target * prot_dist[meal]),
+            }
+            for meal in cal_dist
+        }
+
+        targets_str = "\n".join(
+            f"  - {meal.capitalize()}: exactly {t['calories']} kcal, {t['protein_g']}g protein"
+            for meal, t in meal_targets.items()
+        )
+        targets_str += f"\n  - Daily total: {calorie_target} kcal, {prot_target}g protein"
+
         return await llm.json(
-            messages=[{"role": "user", "content": f"""Create a complete daily meal plan targeting {calorie_target} calories.
+            messages=[{"role": "user", "content": f"""Create a complete daily meal plan.
 Diet: {diet}
 {cuisine_instruction}{nutritionist_context}
+
+EXACT MACRO TARGETS — hit these numbers precisely (your only job is food selection):
+{targets_str}
 
 Apply all the nutritionist context above exactly as a registered dietitian would.
 
@@ -156,13 +187,13 @@ Return JSON:
   "calorie_target": {calorie_target},
   "cuisine": "{cuisine}",
   "meals": {{
-    "breakfast": {{"description": "...", "calories": 0, "protein_g": 0, "carbs_g": 0, "fat_g": 0, "prep_time_min": 0}},
-    "lunch": {{"description": "...", "calories": 0, "protein_g": 0, "carbs_g": 0, "fat_g": 0, "prep_time_min": 0}},
-    "dinner": {{"description": "...", "calories": 0, "protein_g": 0, "carbs_g": 0, "fat_g": 0, "prep_time_min": 0}},
-    "snacks": {{"description": "...", "calories": 0, "protein_g": 0, "carbs_g": 0, "fat_g": 0}}
+    "breakfast": {{"description": "...", "calories": {meal_targets['breakfast']['calories']}, "protein_g": {meal_targets['breakfast']['protein_g']}, "carbs_g": 0, "fat_g": 0, "prep_time_min": 0}},
+    "lunch": {{"description": "...", "calories": {meal_targets['lunch']['calories']}, "protein_g": {meal_targets['lunch']['protein_g']}, "carbs_g": 0, "fat_g": 0, "prep_time_min": 0}},
+    "dinner": {{"description": "...", "calories": {meal_targets['dinner']['calories']}, "protein_g": {meal_targets['dinner']['protein_g']}, "carbs_g": 0, "fat_g": 0, "prep_time_min": 0}},
+    "snacks": {{"description": "...", "calories": {meal_targets['snacks']['calories']}, "protein_g": {meal_targets['snacks']['protein_g']}, "carbs_g": 0, "fat_g": 0}}
   }},
-  "total_calories": 0,
-  "total_protein_g": 0,
+  "total_calories": {calorie_target},
+  "total_protein_g": {prot_target},
   "nutrition_tip": "...",
   "formatted_plan": "Full formatted plan text"
 }}"""}],

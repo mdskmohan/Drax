@@ -114,6 +114,12 @@ class User(Base):
     # Apple Health / Google Health Connect sync
     health_sync_token = Column(String(64), nullable=True, unique=True)
 
+    # Persistent conversation memory — preferences, dislikes, and constraints
+    # extracted from the user's own messages over time.
+    # Each entry: {"key": str, "value": str, "noted_at": ISO datetime}
+    # Injected into every LLM call so Drax never forgets what the user said.
+    chat_memory = Column(JSON, nullable=True)
+
     # Long-term adaptation profile — updated weekly by AdaptationAgent.
     # Contains everything Drax has learned about this specific user:
     # training phase, mesocycle week, skip patterns, chronic pain areas,
