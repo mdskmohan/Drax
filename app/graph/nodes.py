@@ -430,15 +430,32 @@ async def general_node(state: DraxState) -> dict:
     user = state["user"]
     user_input = state.get("user_input", "")
 
-    response = await llm.fast(
+    # Build a profile-aware system prompt so coaching answers are personalised
+    if user:
+        level = user.workout_level.value if user.workout_level else "beginner"
+        gym_days = user.gym_days_per_week or 3
+        current_w = user.current_weight_kg or "?"
+        goal_w = user.goal_weight_kg or "?"
+        profile = (
+            f"User profile: {user.first_name}, {current_w}kg → {goal_w}kg goal, "
+            f"{level} level, {gym_days} gym days/week."
+        )
+    else:
+        profile = ""
+
+    system = (
+        f"You are Drax, an expert AI personal fitness coach. {profile} "
+        f"Answer fitness and coaching questions with specific, evidence-based advice "
+        f"tailored to the user's profile above. When asked about workout splits, scheduling, "
+        f"or methodology (push/pull/legs, bro split, etc.), explain the options clearly and "
+        f"give a concrete recommendation based on their available days and level. "
+        f"Use markdown formatting. Be thorough but conversational — this is a Telegram chat."
+    )
+
+    response = await llm.chat(
         messages=[{"role": "user", "content": user_input}],
-        system=(
-            f"You are Drax, an AI fitness coach on Telegram. "
-            f"The user is {user.first_name if user else 'a user'}. "
-            f"Answer their question briefly and helpfully. "
-            f"If it's a greeting, respond warmly and ask how you can help with their fitness."
-        ),
-        max_tokens=300,
+        system=system,
+        max_tokens=800,
     )
     return {"response": response, "chain_to": ""}
 

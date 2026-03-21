@@ -31,7 +31,24 @@ async def supervisor_node(state: DraxState) -> dict:
     lower = user_input.lower()
     if any(w in lower for w in ["ml", "glass", "bottle", "drank", "water"]):
         return {"intent": "log_water"}
-    if any(w in lower for w in ["workout", "exercise", "gym", "training"]):
+
+    # Detect whether the message is a coaching question / discussion rather than
+    # an action request. Questions about splits, methodology, schedules, etc.
+    # must reach the general node — not generate today's workout.
+    _QUESTION_SIGNALS = {
+        "how ", "what ", "which ", "should i", "should we", "is it",
+        "tell me", "explain", "difference", " vs ", " versus ", " or ",
+        "better ", "recommend", "suggest", "structure", "split",
+        "ppl", "push pull", "push/pull", "bro split", "coach me",
+        "advice", "advise", "plan for", "schedule", "monday", "tuesday",
+        "wednesday", "thursday", "friday", "saturday", "sunday",
+    }
+    _is_question = (
+        lower.endswith("?")
+        or any(sig in lower for sig in _QUESTION_SIGNALS)
+    )
+
+    if not _is_question and any(w in lower for w in ["workout", "exercise", "gym", "training"]):
         return {"intent": "get_workout"}
     if any(w in lower for w in ["motivat", "inspire", "pump", "quote"]):
         return {"intent": "get_motivation"}
