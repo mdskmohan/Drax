@@ -174,6 +174,12 @@ async def _async_send_morning_plan():
                 is_gym = _is_gym_day(user, now_local)
                 water_target = user.daily_water_target_ml or 3000
 
+                # Fetch full coaching context — yesterday's nutrition + workout history
+                from app.graph.nodes import fetch_coaching_context
+                coaching_ctx = await fetch_coaching_context(user.id)
+                yesterday_nutrition = coaching_ctx["yesterday_nutrition"]
+                recent_workout_history = coaching_ctx["recent_workout_history"]
+
                 morning_msg = await motivation.get_morning_motivation(user)
 
                 msg1 = (
@@ -189,7 +195,9 @@ async def _async_send_morning_plan():
 
                 if is_gym:
                     workout_plan = await coach.generate_daily_workout(
-                        user, day_of_week=day_of_week, is_gym_day=True
+                        user, day_of_week=day_of_week, is_gym_day=True,
+                        yesterday_nutrition=yesterday_nutrition,
+                        recent_workout_history=recent_workout_history,
                     )
                     formatted = workout_plan.get("formatted_plan", "")
                     if not formatted:
@@ -233,7 +241,16 @@ async def _async_send_morning_plan():
                         parse_mode="Markdown",
                     )
 
-                meal_plan = await nutrition.generate_daily_meal_plan(user)
+                today_workout_ctx = {
+                    "is_gym_day": is_gym,
+                    "workout_type": workout_plan.get("workout_type", "strength") if is_gym else "rest",
+                    "calories_burned": workout_plan.get("calories_burned_estimate", 300) if is_gym else 0,
+                } if is_gym else {"is_gym_day": False}
+                meal_plan = await nutrition.generate_daily_meal_plan(
+                    user,
+                    today_workout=today_workout_ctx,
+                    yesterday_intake=yesterday_nutrition,
+                )
                 meal_text = "🍽️ *Today's Meal Plan:*\n\n"
                 meals = meal_plan.get("meals", {})
                 meal_emojis = {"breakfast": "🌅", "lunch": "☀️", "dinner": "🌙", "snacks": "🍎"}

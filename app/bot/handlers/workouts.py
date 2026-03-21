@@ -41,10 +41,16 @@ async def show_todays_workout(update: Update, context: ContextTypes.DEFAULT_TYPE
             return
 
         day_of_week = datetime.now().strftime("%A")
+
+        from app.graph.nodes import fetch_coaching_context
+        coaching_ctx = await fetch_coaching_context(user_id)
+
         plan = await coach.generate_daily_workout(
             user,
             day_of_week=day_of_week,
             is_gym_day=True,
+            yesterday_nutrition=coaching_ctx["yesterday_nutrition"],
+            recent_workout_history=coaching_ctx["recent_workout_history"],
         )
 
         # Save workout log

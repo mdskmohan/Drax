@@ -55,6 +55,8 @@ class FitnessCoachAgent(BaseAgent):
         recent_workouts: list[dict] | None = None,
         is_gym_day: bool = True,
         exercise_history: list[dict] | None = None,
+        yesterday_nutrition: dict | None = None,
+        recent_workout_history: list[dict] | None = None,
     ) -> dict:
         # Return cached plan if already generated today
         cache_key = (user.id, date.today(), day_of_week)
@@ -62,6 +64,69 @@ class FitnessCoachAgent(BaseAgent):
             return _workout_cache[cache_key]
 
         recent_summary = f"\nRecent workouts: {recent_workouts}" if recent_workouts else ""
+
+        # ── Live coaching context ─────────────────────────────────────────────
+        # Build the context a personal trainer would review before each session:
+        # yesterday's nutrition and the last 7 days of workout history.
+        coaching_context = ""
+
+        if yesterday_nutrition:
+            cal = yesterday_nutrition.get("calories", 0)
+            cal_target = user.daily_calorie_target or 2000
+            cal_diff = cal - cal_target
+            prot = yesterday_nutrition.get("protein_g", 0)
+            prot_target = user.protein_target_g or 150
+            carbs = yesterday_nutrition.get("carbs_g", 0)
+            fat = yesterday_nutrition.get("fat_g", 0)
+            water = yesterday_nutrition.get("water_ml", 0)
+            water_target = user.daily_water_target_ml or 3000
+
+            coaching_context += (
+                f"\n\nYESTERDAY'S NUTRITION:"
+                f"\n- Calories: {cal} kcal vs {cal_target} target "
+                f"({'OVER' if cal_diff > 0 else 'UNDER'} by {abs(cal_diff)} kcal)"
+                f"\n- Protein: {prot}g vs {prot_target}g target "
+                f"({'✓ met' if prot >= prot_target * 0.9 else '⚠️ LOW — include protein reminder in coach_tip'})"
+                f"\n- Carbs: {carbs}g | Fat: {fat}g"
+                f"\n- Water: {water}ml vs {water_target}ml "
+                f"({'✓' if water >= water_target * 0.8 else '⚠️ LOW — add hydration cue in coach_tip'})"
+            )
+            if cal_diff < -400:
+                coaching_context += (
+                    "\n→ Large caloric deficit yesterday: keep today's intensity moderate, "
+                    "emphasise recovery and do not push to failure."
+                )
+            if prot < prot_target * 0.7:
+                coaching_context += (
+                    "\n→ Protein very low: stress protein intake urgency in the coach_tip field."
+                )
+
+        if recent_workout_history:
+            coaching_context += "\n\nRECENT WORKOUT HISTORY (newest first):"
+            for wh in recent_workout_history[:7]:
+                if wh["completed"] and not wh["skipped"]:
+                    status = "✓ Completed"
+                elif wh["skipped"]:
+                    status = "✗ Skipped"
+                else:
+                    status = "✗ Not completed"
+                pain_flag = " — ⚠️ PAIN reported" if wh["pain_reported"] else ""
+                muscles = (
+                    f" | Muscles trained: {', '.join(wh['muscle_groups'])}"
+                    if wh["muscle_groups"] else ""
+                )
+                coaching_context += (
+                    f"\n  {wh['day_of_week']} {wh['date']}: "
+                    f"{wh['workout_type']} — {status}{muscles}{pain_flag}"
+                )
+            coaching_context += (
+                "\n\nINSTRUCTIONS based on history above:"
+                "\n- Do NOT programme muscle groups that were trained in the last 48 hours."
+                "\n- If the most recent session was skipped or not completed, make today's plan "
+                "approachable and motivating rather than punishing."
+                "\n- If pain was reported recently, avoid exercises that load those areas."
+                "\n- Vary workout type to match the user's weekly pattern (avoid same type 3 days running)."
+            )
 
         # Progressive overload context — format recent performance per exercise
         overload_context = ""
@@ -112,8 +177,9 @@ class FitnessCoachAgent(BaseAgent):
             {
                 "role": "user",
                 "content": f"""Generate a complete {day_of_week} workout plan.
-Is gym day: {is_gym_day}{recent_summary}{equipment_context}{overload_context}
+Is gym day: {is_gym_day}{recent_summary}{equipment_context}{coaching_context}{overload_context}
 Customize ALL exercises based on available equipment above.
+Use the coaching context above exactly as a personal trainer would — respect muscle group recovery, nutrition status, and session history.
 Where exercise history is provided above, apply progressive overload and include the suggested weight in the exercise notes.
 
 Return JSON with this exact structure:

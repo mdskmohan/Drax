@@ -72,8 +72,14 @@ Give 2-3 sentences of helpful feedback on the meal quality and remaining calorie
             max_tokens=200,
         )
 
-    async def generate_daily_meal_plan(self, user: User) -> dict:
+    async def generate_daily_meal_plan(
+        self,
+        user: User,
+        today_workout: dict | None = None,
+        yesterday_intake: dict | None = None,
+    ) -> dict:
         calorie_target = user.daily_calorie_target or (round(user.tdee - 500) if user.tdee else 1800)
+        prot_target = user.protein_target_g or 150
         diet = user.diet_preference.value if user.diet_preference else "omnivore"
         cuisine = getattr(user, "cuisine_preference", None) or "general"
         cuisine_instruction = (
@@ -82,10 +88,68 @@ Give 2-3 sentences of helpful feedback on the meal quality and remaining calorie
             if cuisine != "general"
             else "Cuisine style: any balanced variety."
         )
+
+        # ── Nutritionist context ──────────────────────────────────────────────
+        nutritionist_context = ""
+
+        if today_workout:
+            is_gym = today_workout.get("is_gym_day", False)
+            workout_type = today_workout.get("workout_type", "strength")
+            cal_burned = today_workout.get("calories_burned", 300)
+            if is_gym:
+                nutritionist_context += (
+                    f"\nTODAY IS A TRAINING DAY ({workout_type}, ~{cal_burned} kcal burned):"
+                    "\n- Include a pre-workout meal/snack: carb-focused, light, 1–2 hrs before training."
+                    "\n- Include a post-workout meal: 30–40g protein within 60 min after training."
+                    "\n- Distribute protein evenly across ALL meals (minimum 30g per meal)."
+                    "\n- Slightly higher carb allocation today to fuel performance and replenish glycogen."
+                )
+            else:
+                nutritionist_context += (
+                    "\nTODAY IS A REST DAY:"
+                    "\n- Lower carb allocation, slightly higher healthy fat."
+                    "\n- Prioritise anti-inflammatory foods (oily fish, leafy greens, berries, turmeric)."
+                    "\n- Maintain protein intake — muscles repair on rest days."
+                )
+
+        if yesterday_intake:
+            y_cal = yesterday_intake.get("calories", 0)
+            y_prot = yesterday_intake.get("protein_g", 0)
+            y_water = yesterday_intake.get("water_ml", 0)
+            water_target = user.daily_water_target_ml or 3000
+            diff = y_cal - calorie_target
+            nutritionist_context += (
+                f"\nYESTERDAY'S ACTUAL INTAKE:"
+                f"\n- Calories: {y_cal} kcal (target {calorie_target}, "
+                f"{'OVER' if diff > 0 else 'UNDER'} by {abs(diff)} kcal)"
+                f"\n- Protein: {y_prot}g (target {prot_target}g)"
+                f"\n- Water: {y_water}ml (target {water_target}ml)"
+            )
+            if diff < -400:
+                nutritionist_context += (
+                    f"\n→ User was {abs(diff)} kcal under target. Keep today ON target — do not overcompensate."
+                )
+            elif diff > 400:
+                nutritionist_context += (
+                    f"\n→ User was {diff} kcal over target. Today's plan should be slightly stricter — "
+                    "emphasise fibre and volume foods for satiety."
+                )
+            if y_prot < prot_target * 0.75:
+                nutritionist_context += (
+                    "\n→ Protein was critically low yesterday. Today every meal must be protein-dense. "
+                    "Flag this in nutrition_tip."
+                )
+            if y_water < water_target * 0.6:
+                nutritionist_context += (
+                    "\n→ Hydration was very poor yesterday. Include a hydration reminder in nutrition_tip."
+                )
+
         return await llm.json(
             messages=[{"role": "user", "content": f"""Create a complete daily meal plan targeting {calorie_target} calories.
 Diet: {diet}
-{cuisine_instruction}
+{cuisine_instruction}{nutritionist_context}
+
+Apply all the nutritionist context above exactly as a registered dietitian would.
 
 Return JSON:
 {{

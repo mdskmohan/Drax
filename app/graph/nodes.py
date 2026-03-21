@@ -185,9 +185,14 @@ async def get_workout_node(state: DraxState) -> dict:
             for log in logs_result.scalars().all()
         ]
 
+    # Fetch full coaching context (yesterday's diet + workout history)
+    coaching_ctx = await fetch_coaching_context(user.id)
+
     plan = await _coach.generate_daily_workout(
         user, day_of_week=day, is_gym_day=True,
         exercise_history=exercise_history or None,
+        yesterday_nutrition=coaching_ctx["yesterday_nutrition"],
+        recent_workout_history=coaching_ctx["recent_workout_history"],
     )
 
     # Format
@@ -367,9 +372,22 @@ async def get_plan_node(state: DraxState) -> dict:
             for l in logs_result.scalars().all()
         ] or None
 
-    meal_plan, workout_plan = await _run_parallel(
-        _nutrition.generate_daily_meal_plan(user),
-        _coach.generate_daily_workout(user, day_of_week=week_day, exercise_history=exercise_history),
+    coaching_ctx = await fetch_coaching_context(user.id)
+
+    workout_plan = await _coach.generate_daily_workout(
+        user, day_of_week=week_day, exercise_history=exercise_history,
+        yesterday_nutrition=coaching_ctx["yesterday_nutrition"],
+        recent_workout_history=coaching_ctx["recent_workout_history"],
+    )
+    today_workout_ctx = {
+        "is_gym_day": True,
+        "workout_type": workout_plan.get("workout_type", "strength"),
+        "calories_burned": workout_plan.get("calories_burned_estimate", 300),
+    }
+    meal_plan = await _nutrition.generate_daily_meal_plan(
+        user,
+        today_workout=today_workout_ctx,
+        yesterday_intake=coaching_ctx["yesterday_nutrition"],
     )
 
     response = (
@@ -506,6 +524,85 @@ async def water_nudge_node(state: DraxState) -> dict:
     )
 
     return {"response": existing + nudge, "chain_to": ""}
+
+
+# ── Coaching context helper ───────────────────────────────────────────────────
+
+async def fetch_coaching_context(user_id: int) -> dict:
+    """
+    Fetch all the live data a personal trainer + nutritionist needs:
+    - Yesterday's actual nutrition (calories, protein, carbs, fat, water)
+    - Last 7 days of workout history (type, completion status, muscle groups, pain)
+
+    Returns dict with keys: yesterday_nutrition, recent_workout_history
+    """
+    from datetime import timedelta
+    from app.models.workout_log import WorkoutLog
+
+    now_utc = datetime.now(timezone.utc)
+    yesterday_start = (now_utc - timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+    yesterday_end = now_utc.replace(hour=0, minute=0, second=0, microsecond=0)
+    seven_days_ago = now_utc - timedelta(days=7)
+
+    async with AsyncSessionLocal() as session:
+        macro_r = await session.execute(
+            select(
+                func.sum(MealLog.calories),
+                func.sum(MealLog.protein_g),
+                func.sum(MealLog.carbs_g),
+                func.sum(MealLog.fat_g),
+            )
+            .where(MealLog.user_id == user_id)
+            .where(MealLog.logged_at >= yesterday_start)
+            .where(MealLog.logged_at < yesterday_end)
+        )
+        macro_row = macro_r.one()
+
+        water_r = await session.execute(
+            select(func.sum(WaterLog.amount_ml))
+            .where(WaterLog.user_id == user_id)
+            .where(WaterLog.logged_at >= yesterday_start)
+            .where(WaterLog.logged_at < yesterday_end)
+        )
+        yesterday_water = water_r.scalar() or 0.0
+
+        wl_r = await session.execute(
+            select(WorkoutLog)
+            .where(WorkoutLog.user_id == user_id)
+            .where(WorkoutLog.created_at >= seven_days_ago)
+            .order_by(WorkoutLog.created_at.desc())
+        )
+        workout_rows = wl_r.scalars().all()
+
+    yesterday_nutrition = {
+        "calories": round(macro_row[0] or 0),
+        "protein_g": round(macro_row[1] or 0, 1),
+        "carbs_g": round(macro_row[2] or 0, 1),
+        "fat_g": round(macro_row[3] or 0, 1),
+        "water_ml": round(yesterday_water),
+    }
+
+    recent_workout_history = []
+    for wl in workout_rows:
+        muscle_groups = list({
+            ex.get("muscle_group", "").lower()
+            for ex in (wl.exercises or [])
+            if ex.get("muscle_group")
+        })
+        recent_workout_history.append({
+            "date": str(wl.created_at.date()) if wl.created_at else "",
+            "day_of_week": wl.created_at.strftime("%A") if wl.created_at else "",
+            "workout_type": wl.workout_type or "unknown",
+            "completed": bool(wl.completed),
+            "skipped": wl.completion_notes == "Skipped",
+            "pain_reported": bool(wl.pain_reported),
+            "muscle_groups": muscle_groups,
+        })
+
+    return {
+        "yesterday_nutrition": yesterday_nutrition,
+        "recent_workout_history": recent_workout_history,
+    }
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
